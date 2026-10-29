@@ -3,7 +3,7 @@
  */
 
 // IndexedDB Helper for offline video backup
-const IDB_NAME = 'LoomCloneDB';
+const IDB_NAME = 'AppzGrabarDB';
 const IDB_STORE = 'videos';
 
 function openIDB() {

@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  loom-app:
+  appzgrabar:
     build: .
-    container_name: loom-clone
+    container_name: appzgrabar
     restart: always
     ports:
       - "3000:3000"

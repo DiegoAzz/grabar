@@ -1,7 +1,7 @@
 {
-  "name": "loom-clone",
+  "name": "appzgrabar",
   "version": "1.0.0",
-  "description": "Full-featured Loom clone for screen & webcam recording, cloud storage and video sharing",
+  "description": "AppzGrabar - Plataforma de grabación de pantalla y cámara web en la nube",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

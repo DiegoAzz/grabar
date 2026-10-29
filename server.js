@@ -247,8 +247,8 @@ app.post('/api/videos/upload', upload.fields([
 
     const newVideo = {
       id: uuidv4().slice(0, 12),
-      title: req.body.title || `Screen Recording - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
-      description: req.body.description || "Recorded with Loom Clone",
+      title: req.body.title || `Grabación de Pantalla - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+      description: req.body.description || "Grabado con AppzGrabar",
       filename: videoFile.filename,
       videoUrl: `/uploads/${videoFile.filename}`,
       thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : null,
@@ -401,7 +401,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
-  console.log(`🎥 Loom Clone Server is running on: http://localhost:${PORT}`);
+  console.log(`🎥 AppzGrabar Server is running on: http://localhost:${PORT}`);
   console.log(`📁 Video uploads stored in: ${UPLOADS_DIR}`);
   console.log(`=======================================================`);
 });

@@ -134,7 +134,7 @@ async function loadVideoData() {
 
 // Render Video Details to UI
 function renderVideoDetails(video) {
-  document.title = `${video.title} - Loom`;
+  document.title = `${video.title} - AppzGrabar`;
   videoTitle.textContent = video.title;
   videoDescription.textContent = video.description || 'Sin descripción';
 

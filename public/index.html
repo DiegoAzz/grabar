@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loom - Grabación de Pantalla y Mensajería de Video Asíncrona</title>
+  <title>AppzGrabar - Grabación de Pantalla y Video</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
@@ -20,14 +20,14 @@
   <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
   <header class="h-14 bg-white border-b border-gray-200 px-5 flex items-center justify-between sticky top-0 z-40">
     <div class="flex items-center gap-6">
-      <!-- Logo Loom -->
+      <!-- Logo AppzGrabar -->
       <a href="/" class="flex items-center gap-2 font-bold text-xl tracking-tight text-gray-900 group">
         <div class="w-8 h-8 rounded-lg bg-[#625df5] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
           <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
             <path d="M12 2a2 2 0 0 1 2 2v2.1a6.002 6.002 0 0 1 4.9 3.55l1.82-1.05a2 2 0 1 1 2 3.46l-1.82 1.05c.07.45.1 0.91.1 1.39s-.03.94-.1 1.39l1.82 1.05a2 2 0 1 1-2 3.46l-1.82-1.05A6.002 6.002 0 0 1 14 20.9V23a2 2 0 1 1-4 0v-2.1a6.002 6.002 0 0 1-4.9-3.55l-1.82 1.05a2 2 0 1 1-2-3.46l1.82-1.05A6.08 6.08 0 0 1 3 13.5c0-.48.03-.94.1-1.39L1.28 11.06a2 2 0 1 1 2-3.46l1.82 1.05A6.002 6.002 0 0 1 10 5.1V3a2 2 0 0 1 2-1zm0 7a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
           </svg>
         </div>
-        <span class="font-['Outfit'] font-bold text-xl text-gray-900">Loom</span>
+        <span class="font-['Outfit'] font-bold text-xl text-gray-900">AppzGrabar</span>
       </a>
 
       <!-- Buscador Universal -->
@@ -36,7 +36,7 @@
         <input 
           id="global-search-input"
           type="text" 
-          placeholder="Buscar personas, etiquetas, carpetas, espacios y Looms" 
+          placeholder="Buscar personas, etiquetas, carpetas, espacios y grabaciones" 
           class="w-full bg-[#f3f4f6] text-sm text-gray-700 pl-9 pr-12 py-1.5 rounded-full border border-transparent focus:border-[#625df5] focus:bg-white focus:outline-none transition-all placeholder-gray-400"
         />
         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded border border-gray-300">Ctrl K</span>
@@ -47,7 +47,7 @@
     <div class="flex items-center gap-3">
       <button id="open-record-widget-btn" class="flex items-center gap-2 bg-[#ff5745] hover:bg-[#f04836] text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm transition-all active:scale-95">
         <i data-lucide="video" class="w-4 h-4"></i>
-        <span>Grabar un Loom</span>
+        <span>Grabar en AppzGrabar</span>
       </button>
 
       <button class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative" title="Notificaciones">
@@ -75,10 +75,10 @@
         <div class="p-2 rounded-xl hover:bg-gray-100 cursor-pointer flex items-center justify-between mb-2 transition-colors">
           <div class="flex items-center gap-2.5">
             <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
-              S
+              A
             </div>
             <div>
-              <div class="text-sm font-semibold text-gray-800 leading-tight">Espacio de Samantha</div>
+              <div class="text-sm font-semibold text-gray-800 leading-tight">Espacio AppzGrabar</div>
               <div class="text-[11px] text-gray-500">1 miembro</div>
             </div>
           </div>
@@ -195,7 +195,7 @@
             <i data-lucide="video" class="w-8 h-8"></i>
           </div>
           <h3 class="text-lg font-semibold text-gray-900">Aún no hay videos grabados</h3>
-          <p class="text-sm text-gray-500 mt-1 max-w-sm mx-auto">Haz clic en "Grabar un Loom" para capturar tu pantalla y la burbuja de cámara circular.</p>
+          <p class="text-sm text-gray-500 mt-1 max-w-sm mx-auto">Haz clic en "Grabar en AppzGrabar" para capturar tu pantalla y la burbuja de cámara circular.</p>
           <button id="empty-record-btn" class="mt-4 px-5 py-2.5 bg-[#ff5745] hover:bg-[#f04836] text-white text-sm font-semibold rounded-full shadow-sm transition-all inline-flex items-center gap-2">
             <i data-lucide="video" class="w-4 h-4"></i>
             <span>Comenzar a grabar ahora</span>
@@ -393,7 +393,7 @@
         <i data-lucide="loader-2" class="w-7 h-7"></i>
       </div>
       <div>
-        <h3 class="text-lg font-bold text-gray-900">Guardando tu video de Loom...</h3>
+        <h3 class="text-lg font-bold text-gray-900">Guardando tu video en AppzGrabar...</h3>
         <p class="text-xs text-gray-500 mt-1">Codificando y subiendo el video a tu biblioteca de trabajo.</p>
       </div>
       <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
