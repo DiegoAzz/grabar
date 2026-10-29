@@ -86,12 +86,109 @@ const uploadProgressBar = document.getElementById('upload-progress-bar');
 
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', async () => {
+  await checkAuthAndSetupProfile();
   await fetchVideos();
   await setupDeviceSelectors();
   setupRecordingControls();
   setupCameraBubbleDragging();
   setupNavCategories();
 });
+
+// Check Authentication & Setup User Profile
+async function checkAuthAndSetupProfile() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (!data.authenticated) {
+      window.location.href = '/login.html';
+      return;
+    }
+
+    const user = data.user;
+    const headerUserName = document.getElementById('header-user-name');
+    const headerUserAvatar = document.getElementById('header-user-avatar');
+    const dropdownUserName = document.getElementById('dropdown-user-name');
+    const dropdownUserEmail = document.getElementById('dropdown-user-email');
+
+    if (headerUserName) headerUserName.textContent = user.name || 'Diego';
+    if (headerUserAvatar && user.avatar) headerUserAvatar.src = user.avatar;
+    if (dropdownUserName) dropdownUserName.textContent = user.name || 'Diego';
+    if (dropdownUserEmail) dropdownUserEmail.textContent = user.email || 'diego@appzplay.online';
+
+  } catch (err) {
+    console.warn("Auth check error:", err);
+  }
+
+  // User Dropdown Menu Toggle
+  const userMenuBtn = document.getElementById('user-menu-btn');
+  const userDropdownMenu = document.getElementById('user-dropdown-menu');
+  const logoutBtn = document.getElementById('logout-btn');
+  const changePasswordBtn = document.getElementById('change-password-btn');
+  const passwordModal = document.getElementById('password-modal');
+  const closePasswordModal = document.getElementById('close-password-modal');
+  const changePasswordForm = document.getElementById('change-password-form');
+
+  if (userMenuBtn && userDropdownMenu) {
+    userMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdownMenu.classList.toggle('hidden');
+    });
+
+    window.addEventListener('click', () => {
+      userDropdownMenu.classList.add('hidden');
+    });
+  }
+
+  // Logout Handler
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        localStorage.removeItem('appzgrabar_user');
+        window.location.href = '/login.html';
+      } catch (e) {
+        window.location.href = '/login.html';
+      }
+    });
+  }
+
+  // Change Password Modal
+  if (changePasswordBtn && passwordModal) {
+    changePasswordBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdownMenu.classList.add('hidden');
+      passwordModal.classList.remove('hidden');
+    });
+
+    closePasswordModal.addEventListener('click', () => {
+      passwordModal.classList.add('hidden');
+    });
+
+    changePasswordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('curr-pass-input').value;
+      const newPassword = document.getElementById('new-pass-input').value;
+
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast("Contraseña cambiada con éxito");
+          passwordModal.classList.add('hidden');
+          changePasswordForm.reset();
+        } else {
+          alert(d.error || "Error al cambiar la contraseña");
+        }
+      } catch (err) {
+        alert("Error de conexión");
+      }
+    });
+  }
+}
 
 // Fetch videos from backend
 async function fetchVideos(query = '') {

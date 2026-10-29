@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión - AppzGrabar</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-[#f8fafc] text-[#1f2937] min-h-screen flex flex-col justify-between font-['Inter'] antialiased">
+
+  <!-- Header minimalista -->
+  <header class="p-6">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2 font-bold text-xl tracking-tight text-gray-900 group">
+        <div class="w-9 h-9 rounded-xl bg-[#625df5] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <path d="M12 2a2 2 0 0 1 2 2v2.1a6.002 6.002 0 0 1 4.9 3.55l1.82-1.05a2 2 0 1 1 2 3.46l-1.82 1.05c.07.45.1 0.91.1 1.39s-.03.94-.1 1.39l1.82 1.05a2 2 0 1 1-2 3.46l-1.82-1.05A6.002 6.002 0 0 1 14 20.9V23a2 2 0 1 1-4 0v-2.1a6.002 6.002 0 0 1-4.9-3.55l-1.82 1.05a2 2 0 1 1-2-3.46l1.82-1.05A6.08 6.08 0 0 1 3 13.5c0-.48.03-.94.1-1.39L1.28 11.06a2 2 0 1 1 2-3.46l1.82 1.05A6.002 6.002 0 0 1 10 5.1V3a2 2 0 0 1 2-1zm0 7a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+          </svg>
+        </div>
+        <span class="font-['Outfit'] font-bold text-2xl text-gray-900">AppzGrabar</span>
+      </a>
+      <span class="text-xs text-gray-500 font-medium bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+        Panel Privado
+      </span>
+    </div>
+  </header>
+
+  <!-- Contenedor central -->
+  <main class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-3xl border border-gray-200/80 shadow-xl shadow-gray-200/50 p-8 space-y-6">
+      
+      <!-- Títulos -->
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 bg-indigo-50 text-[#625df5] rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+          <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Iniciar Sesión</h1>
+        <p class="text-xs text-gray-500 max-w-xs mx-auto">
+          Acceso exclusivo para el administrador de AppzGrabar.
+        </p>
+      </div>
+
+      <!-- Alerta de Error -->
+      <div id="error-alert" class="hidden p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0 text-red-500"></i>
+        <span id="error-message">Credenciales incorrectas</span>
+      </div>
+
+      <!-- Formulario -->
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label for="username" class="block text-xs font-semibold text-gray-700 mb-1.5">
+            Usuario o Correo Electrónico
+          </label>
+          <div class="relative">
+            <i data-lucide="user" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input 
+              id="username" 
+              name="username" 
+              type="text" 
+              required 
+              placeholder="diego@appzplay.online o admin" 
+              class="w-full pl-10 pr-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#625df5] focus:bg-white transition-all"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="password" class="block text-xs font-semibold text-gray-700 mb-1.5">
+            Contraseña
+          </label>
+          <div class="relative">
+            <i data-lucide="key" class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input 
+              id="password" 
+              name="password" 
+              type="password" 
+              required 
+              placeholder="Ingresa tu contraseña" 
+              class="w-full pl-10 pr-10 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#625df5] focus:bg-white transition-all"
+            />
+            <button 
+              type="button" 
+              id="toggle-password-btn" 
+              class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs pt-1">
+          <label class="flex items-center gap-2 cursor-pointer text-gray-600">
+            <input type="checkbox" id="remember-me" checked class="rounded border-gray-300 text-[#625df5] focus:ring-[#625df5] w-4 h-4">
+            <span>Mantener sesión iniciada</span>
+          </label>
+        </div>
+
+        <button 
+          type="submit" 
+          id="submit-btn" 
+          class="w-full py-3 bg-[#625df5] hover:bg-[#504be4] active:scale-[0.98] text-white rounded-xl font-semibold text-sm shadow-md shadow-[#625df5]/25 transition-all flex items-center justify-center gap-2"
+        >
+          <span id="btn-text">Iniciar Sesión</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+
+      <!-- Tarjeta de información de credenciales iniciales -->
+      <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 text-xs space-y-1.5 text-indigo-950">
+        <div class="font-bold flex items-center gap-1.5 text-indigo-800">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-indigo-600"></i>
+          <span>Acceso Administrador (Por defecto)</span>
+        </div>
+        <p class="text-[11px] text-indigo-800/80">
+          <strong>Usuario:</strong> <code class="bg-white/80 px-1 py-0.5 rounded text-indigo-900">admin</code> o <code class="bg-white/80 px-1 py-0.5 rounded text-indigo-900">diego@appzplay.online</code><br>
+          <strong>Contraseña:</strong> <code class="bg-white/80 px-1 py-0.5 rounded text-indigo-900">admin123</code>
+        </p>
+        <p class="text-[10px] text-indigo-700/70 pt-1">
+          * Podrás cambiar la contraseña en cualquier momento desde el panel o variables de entorno.
+        </p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="p-6 text-center text-xs text-gray-400">
+    AppzGrabar &copy; 2026 • Plataforma privada de grabación y compartición de video
+  </footer>
+
+  <script>
+    // Inicializar iconos
+    lucide.createIcons();
+
+    // Toggle mostrar/ocultar contraseña
+    const passwordInput = document.getElementById('password');
+    const togglePasswordBtn = document.getElementById('toggle-password-btn');
+    togglePasswordBtn.addEventListener('click', () => {
+      const isPassword = passwordInput.type === 'password';
+      passwordInput.type = isPassword ? 'text' : 'password';
+      togglePasswordBtn.innerHTML = isPassword ? '<i data-lucide="eye-off" class="w-4 h-4"></i>' : '<i data-lucide="eye" class="w-4 h-4"></i>';
+      lucide.createIcons();
+    });
+
+    // Envío del formulario
+    const loginForm = document.getElementById('login-form');
+    const errorAlert = document.getElementById('error-alert');
+    const errorMessage = document.getElementById('error-message');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorAlert.classList.add('hidden');
+      
+      const username = document.getElementById('username').value.trim();
+      const password = passwordInput.value;
+      const remember = document.getElementById('remember-me').checked;
+
+      btnText.textContent = "Verificando...";
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, remember })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // Guardar usuario en localStorage
+          localStorage.setItem('appzgrabar_user', JSON.stringify(data.user));
+          window.location.href = '/';
+        } else {
+          errorMessage.textContent = data.error || "Credenciales incorrectas";
+          errorAlert.classList.remove('hidden');
+          submitBtn.disabled = false;
+          btnText.textContent = "Iniciar Sesión";
+        }
+      } catch (err) {
+        errorMessage.textContent = "Error de conexión con el servidor";
+        errorAlert.classList.remove('hidden');
+        submitBtn.disabled = false;
+        btnText.textContent = "Iniciar Sesión";
+      }
+    });
+
+    // Si ya está autenticado, redirigir al panel
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          window.location.href = '/';
+        }
+      }).catch(() => {});
+  </script>
+</body>
+</html>
