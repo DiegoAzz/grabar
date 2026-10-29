@@ -233,27 +233,37 @@ class LoomRecorder {
     this.recordedChunks = [];
     this.recordDuration = 0;
 
-    // 1. Get Screen Stream
+    // 1. Get Screen Stream (with resilient fallback for system audio)
     try {
-      const displayMediaOptions = {
-        video: {
-          displaySurface: recordingMode === 'window' ? 'window' : (recordingMode === 'tab' ? 'browser' : 'monitor'),
-          cursor: 'always'
-        },
-        audio: true
-      };
-
-      this.screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+      try {
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            displaySurface: recordingMode === 'window' ? 'window' : (recordingMode === 'tab' ? 'browser' : 'monitor'),
+            cursor: 'always'
+          },
+          audio: true
+        });
+      } catch (audioErr) {
+        console.warn("Screen capture with system audio not supported or denied, falling back to video-only capture:", audioErr);
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            displaySurface: recordingMode === 'window' ? 'window' : (recordingMode === 'tab' ? 'browser' : 'monitor'),
+            cursor: 'always'
+          },
+          audio: false
+        });
+      }
     } catch (err) {
       console.error("Screen capture cancelled or denied:", err);
-      throw new Error("Screen capture was cancelled or permission denied.");
+      throw new Error("Captura de pantalla cancelada o permiso denegado.");
     }
 
-    // Handle user clicking "Stop sharing" on browser native bar
+    // Handle user clicking "Stop sharing" on browser native ribbon
     const screenTrack = this.screenStream.getVideoTracks()[0];
     if (screenTrack) {
       screenTrack.onended = () => {
         if (this.isRecording) {
+          console.log("Flujo de pantalla finalizado por el navegador. Guardando video grabado...");
           const stopBtn = document.getElementById('bar-stop-btn');
           if (stopBtn) stopBtn.click();
         }
@@ -315,33 +325,41 @@ class LoomRecorder {
       videoTrackToRecord = this.screenStream.getVideoTracks()[0];
     }
 
-    // 5. Audio Mixing (Mic + Screen audio)
+    // 5. Persistent Audio Mixing (Mic + Screen audio) - Kept on instance to prevent Garbage Collection
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const mixAudioContext = new AudioCtx();
-    const destination = mixAudioContext.createMediaStreamDestination();
+    if (this.mixAudioContext && this.mixAudioContext.state !== 'closed') {
+      try { this.mixAudioContext.close(); } catch (e) {}
+    }
+    this.mixAudioContext = new AudioCtx();
+    this.audioDestination = this.mixAudioContext.createMediaStreamDestination();
 
     // Add screen audio if present
     const screenAudioTracks = this.screenStream.getAudioTracks();
     if (screenAudioTracks.length > 0) {
       try {
-        const screenAudioSource = mixAudioContext.createMediaStreamSource(new MediaStream([screenAudioTracks[0]]));
-        screenAudioSource.connect(destination);
-      } catch (e) {}
+        this.screenAudioSource = this.mixAudioContext.createMediaStreamSource(new MediaStream([screenAudioTracks[0]]));
+        this.screenAudioSource.connect(this.audioDestination);
+      } catch (e) {
+        console.warn("Screen audio mix error:", e);
+      }
     }
 
     // Add microphone audio if enabled
     if (this.micEnabled && this.audioStream) {
       try {
-        const micAudioSource = mixAudioContext.createMediaStreamSource(this.audioStream);
-        micAudioSource.connect(destination);
-      } catch (e) {}
+        this.micAudioSource = this.mixAudioContext.createMediaStreamSource(this.audioStream);
+        this.micAudioSource.connect(this.audioDestination);
+      } catch (e) {
+        console.warn("Mic audio mix error:", e);
+      }
     }
 
     // Combine video track + mixed audio tracks
-    const mixedTracks = [videoTrackToRecord, ...destination.stream.getAudioTracks()];
+    const audioTracks = this.audioDestination ? this.audioDestination.stream.getAudioTracks() : [];
+    const mixedTracks = [videoTrackToRecord, ...audioTracks];
     this.combinedStream = new MediaStream(mixedTracks);
 
-    // 6. Initialize MediaRecorder
+    // 6. Initialize MediaRecorder with fault tolerance
     let mimeType = 'video/webm;codecs=vp9,opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
       mimeType = 'video/webm;codecs=vp8,opus';
@@ -362,6 +380,15 @@ class LoomRecorder {
       }
     };
 
+    this.mediaRecorder.onerror = (e) => {
+      console.error("MediaRecorder error caught:", e);
+      if (this.isRecording) {
+        const stopBtn = document.getElementById('bar-stop-btn');
+        if (stopBtn) stopBtn.click();
+      }
+    };
+
+    // Slice in 1-second intervals
     this.mediaRecorder.start(1000);
     this.isRecording = true;
     this.isPaused = false;
@@ -512,19 +539,24 @@ class LoomRecorder {
   }
 
   async stopRecording() {
-    return new Promise((resolve) => {
-      if (!this.mediaRecorder) {
-        resolve(null);
-        return;
-      }
-
+    return new Promise(async (resolve) => {
       clearInterval(this.timerInterval);
       this.isCompositing = false;
       if (this.compositeAnimFrame) cancelAnimationFrame(this.compositeAnimFrame);
 
-      this.mediaRecorder.onstop = async () => {
+      const buildAndFinish = async () => {
+        // As long as we captured chunks, we never throw them away
+        if (!this.recordedChunks || this.recordedChunks.length === 0) {
+          this.cleanupStreams();
+          this.isRecording = false;
+          this.isPaused = false;
+          if (this.onStateChange) this.onStateChange({ isRecording: false, isPaused: false });
+          resolve(null);
+          return;
+        }
+
         const finalBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
-        
+
         // Generate crisp thumbnail
         let thumbBlob = null;
         try {
@@ -533,15 +565,17 @@ class LoomRecorder {
           thumbCanvas.height = 360;
           const tCtx = thumbCanvas.getContext('2d');
           
-          if (this.compositeCanvas && this.isCompositing) {
+          if (this.compositeCanvas && this.compositeCanvas.width > 0) {
             tCtx.drawImage(this.compositeCanvas, 0, 0, 640, 360);
           } else if (this.screenVideoElem && this.screenVideoElem.videoWidth > 0) {
             tCtx.drawImage(this.screenVideoElem, 0, 0, 640, 360);
           }
           thumbBlob = await new Promise(r => thumbCanvas.toBlob(r, 'image/jpeg', 0.85));
         } catch (e) {
-          console.warn("Thumbnail capture failed:", e);
+          console.warn("Thumbnail capture error:", e);
         }
+
+        const dur = Math.max(1, this.recordDuration);
 
         // Cleanup tracks
         this.cleanupStreams();
@@ -553,15 +587,29 @@ class LoomRecorder {
         resolve({
           videoBlob: finalBlob,
           thumbnailBlob: thumbBlob,
-          duration: this.recordDuration
+          duration: dur
         });
       };
 
-      if (this.mediaRecorder.state !== 'inactive') {
-        this.mediaRecorder.stop();
+      if (!this.mediaRecorder) {
+        await buildAndFinish();
+        return;
+      }
+
+      if (this.mediaRecorder.state === 'recording' || this.mediaRecorder.state === 'paused') {
+        try {
+          this.mediaRecorder.requestData();
+        } catch (e) {}
+
+        this.mediaRecorder.onstop = buildAndFinish;
+        try {
+          this.mediaRecorder.stop();
+        } catch (e) {
+          await buildAndFinish();
+        }
       } else {
-        this.cleanupStreams();
-        resolve(null);
+        // MediaRecorder was already inactive or stopped (e.g. Chrome toolbar "Stop sharing")
+        await buildAndFinish();
       }
     });
   }
@@ -571,7 +619,7 @@ class LoomRecorder {
     this.isCompositing = false;
     if (this.compositeAnimFrame) cancelAnimationFrame(this.compositeAnimFrame);
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
+      try { this.mediaRecorder.stop(); } catch (e) {}
     }
     this.recordedChunks = [];
     this.cleanupStreams();
@@ -593,6 +641,10 @@ class LoomRecorder {
     if (this.screenVideoElem) {
       this.screenVideoElem.pause();
       this.screenVideoElem.srcObject = null;
+    }
+    if (this.mixAudioContext && this.mixAudioContext.state !== 'closed') {
+      try { this.mixAudioContext.close(); } catch (e) {}
+      this.mixAudioContext = null;
     }
   }
 }

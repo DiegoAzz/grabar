@@ -471,34 +471,41 @@ function setupRecordingControls() {
   };
 
   // Stop Recording
+  let isStoppingRecording = false;
   barStopBtn.addEventListener('click', async () => {
+    if (isStoppingRecording) return;
+    isStoppingRecording = true;
+
     floatingControls.classList.add('hidden');
     savingModal.classList.remove('hidden');
     uploadProgressBar.style.width = '35%';
 
-    const result = await window.loomRecorder.stopRecording();
-    if (!result || !result.videoBlob) {
-      savingModal.classList.add('hidden');
-      recordWidget.classList.remove('hidden');
-      return;
-    }
-
-    uploadProgressBar.style.width = '70%';
-
-    // Prepare FormData for backend
-    const formData = new FormData();
-    formData.append('video', result.videoBlob, `loom-${Date.now()}.webm`);
-    if (result.thumbnailBlob) {
-      formData.append('thumbnail', result.thumbnailBlob, `thumb-${Date.now()}.jpg`);
-    }
-    formData.append('duration', result.duration);
-    formData.append('title', `Grabación de Pantalla - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
-    formData.append('category', activeCategory);
-
     try {
+      const result = await window.loomRecorder.stopRecording();
+      if (!result || !result.videoBlob || result.videoBlob.size === 0) {
+        console.warn("No se generó video o el archivo está vacío.");
+        savingModal.classList.add('hidden');
+        recordWidget.classList.remove('hidden');
+        isStoppingRecording = false;
+        return;
+      }
+
+      uploadProgressBar.style.width = '70%';
+
+      // Prepare FormData for backend
+      const formData = new FormData();
+      formData.append('video', result.videoBlob, `appzgrabar-${Date.now()}.webm`);
+      if (result.thumbnailBlob) {
+        formData.append('thumbnail', result.thumbnailBlob, `thumb-${Date.now()}.jpg`);
+      }
+      formData.append('duration', result.duration);
+      formData.append('title', `Grabación de Pantalla - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+      formData.append('category', activeCategory);
+
       const res = await fetch('/api/videos/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
       });
       const data = await res.json();
       uploadProgressBar.style.width = '100%';
@@ -510,13 +517,15 @@ function setupRecordingControls() {
         // Redirect to watch page
         window.location.href = `/v/${data.video.id}`;
       } else {
-        throw new Error(data.error || 'Fallo en la subida');
+        throw new Error(data.error || 'Error al guardar el video en el servidor');
       }
     } catch (err) {
       console.error("Upload error:", err);
-      alert("No se pudo subir el video al servidor. Guardando copia local...");
+      alert("Aviso: " + (err.message || "Error al subir video. Guardando copia de seguridad..."));
       savingModal.classList.add('hidden');
-      fetchVideos();
+      await fetchVideos();
+    } finally {
+      isStoppingRecording = false;
     }
   });
 
