@@ -555,11 +555,98 @@ function setupRecordingControls() {
     }
   });
 
-  // Draw pen tool toggle
-  barDrawBtn.addEventListener('click', () => {
-    window.loomRecorder.isDrawingActive = !window.loomRecorder.isDrawingActive;
-    barDrawBtn.classList.toggle('active', window.loomRecorder.isDrawingActive);
-  });
+  // Draw pen tool toggle & Drawing engine
+  const drawPalette = document.getElementById('draw-palette');
+  const drawCanvas = document.getElementById('drawing-canvas-overlay');
+  const drawClearBtn = document.getElementById('draw-clear-btn');
+  let drawColor = '#ff5745';
+  let isPainting = false;
+  let currentStroke = null;
+
+  if (drawCanvas && barDrawBtn) {
+    drawCanvas.width = window.innerWidth;
+    drawCanvas.height = window.innerHeight;
+    window.addEventListener('resize', () => {
+      drawCanvas.width = window.innerWidth;
+      drawCanvas.height = window.innerHeight;
+    });
+
+    const dCtx = drawCanvas.getContext('2d');
+
+    barDrawBtn.addEventListener('click', () => {
+      window.loomRecorder.isDrawingActive = !window.loomRecorder.isDrawingActive;
+      const active = window.loomRecorder.isDrawingActive;
+      barDrawBtn.classList.toggle('active', active);
+      barDrawBtn.classList.toggle('bg-[#625df5]', active);
+      barDrawBtn.classList.toggle('text-white', active);
+      if (drawPalette) drawPalette.classList.toggle('hidden', !active);
+
+      if (active) {
+        drawCanvas.style.pointerEvents = 'auto';
+        drawCanvas.style.cursor = 'crosshair';
+        showToast("Lápiz activado: puedes dibujar y señalar en pantalla");
+      } else {
+        drawCanvas.style.pointerEvents = 'none';
+        drawCanvas.style.cursor = 'default';
+      }
+    });
+
+    // Select color
+    document.querySelectorAll('.draw-color-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        drawColor = btn.getAttribute('data-color');
+        document.querySelectorAll('.draw-color-btn').forEach(b => {
+          b.classList.remove('ring-2', 'ring-white', 'scale-110');
+        });
+        btn.classList.add('ring-2', 'ring-white', 'scale-110');
+      });
+    });
+
+    // Clear drawings
+    if (drawClearBtn) {
+      drawClearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        window.loomRecorder.drawStrokes = [];
+      });
+    }
+
+    // Drawing interaction
+    drawCanvas.addEventListener('mousedown', (e) => {
+      if (!window.loomRecorder.isDrawingActive) return;
+      isPainting = true;
+      currentStroke = {
+        color: drawColor,
+        width: 4,
+        points: [{ x: e.clientX, y: e.clientY }]
+      };
+      dCtx.beginPath();
+      dCtx.strokeStyle = drawColor;
+      dCtx.lineWidth = 4;
+      dCtx.lineCap = 'round';
+      dCtx.lineJoin = 'round';
+      dCtx.moveTo(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isPainting || !currentStroke) return;
+      currentStroke.points.push({ x: e.clientX, y: e.clientY });
+      dCtx.lineTo(e.clientX, e.clientY);
+      dCtx.stroke();
+      window.loomRecorder.currentStroke = currentStroke;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!isPainting) return;
+      isPainting = false;
+      if (currentStroke && currentStroke.points.length > 1) {
+        window.loomRecorder.drawStrokes.push(currentStroke);
+      }
+      currentStroke = null;
+      window.loomRecorder.currentStroke = null;
+    });
+  }
 }
 
 function updateTimerDisplay(totalSeconds) {

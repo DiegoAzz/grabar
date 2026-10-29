@@ -381,10 +381,27 @@
     </button>
 
     <!-- Herramienta de lápiz de dibujo -->
-    <button id="bar-draw-btn" class="floating-btn" title="Anotar / Dibujar en pantalla">
-      <i data-lucide="pen-tool" class="w-4 h-4"></i>
-    </button>
+    <div class="relative">
+      <button id="bar-draw-btn" class="floating-btn" title="Anotar / Dibujar en pantalla">
+        <i data-lucide="pen-tool" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Mini Paleta de Colores de Dibujo -->
+      <div id="draw-palette" class="hidden absolute left-14 bottom-0 bg-[#1e2229] border border-white/10 rounded-2xl p-2 shadow-2xl flex items-center gap-2 z-50">
+        <button class="draw-color-btn w-5 h-5 rounded-full bg-[#ff5745] ring-2 ring-white transition-all scale-110" data-color="#ff5745" title="Rojo Loom"></button>
+        <button class="draw-color-btn w-5 h-5 rounded-full bg-[#3b82f6] transition-all" data-color="#3b82f6" title="Azul"></button>
+        <button class="draw-color-btn w-5 h-5 rounded-full bg-[#10b981] transition-all" data-color="#10b981" title="Verde"></button>
+        <button class="draw-color-btn w-5 h-5 rounded-full bg-[#eab308] transition-all" data-color="#eab308" title="Amarillo"></button>
+        <div class="w-px h-4 bg-white/20"></div>
+        <button id="draw-clear-btn" class="p-1 text-gray-400 hover:text-white rounded-lg hover:bg-white/10" title="Borrar dibujos">
+          <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
   </div>
+
+  <!-- Lienzo de Anotaciones en Pantalla -->
+  <canvas id="drawing-canvas-overlay" class="fixed inset-0 pointer-events-none z-[9990]"></canvas>
 
   <!-- ========================================================================= -->
   <!-- BURBUJA DE CÁMARA CIRCULAR FLOTANTE (Inferior Izquierda) -->
