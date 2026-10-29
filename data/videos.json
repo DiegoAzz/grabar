@@ -1,0 +1,200 @@
+[
+  {
+    "id": "82c88494-812",
+    "title": "Grabación de Pantalla - 29 oct, 13:33",
+    "description": "Recorded with Loom Clone",
+    "filename": "1793298786523-43ad6e27.webm",
+    "videoUrl": "/uploads/1793298786523-43ad6e27.webm",
+    "thumbnail": "/uploads/1793298786533-470a181f.jpg",
+    "duration": 11,
+    "durationFormatted": "00:11",
+    "size": 824803,
+    "createdAt": "2026-10-29T18:33:06.534Z",
+    "views": 2,
+    "category": "videos",
+    "author": {
+      "name": "Samantha Vance",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      "role": "Creator"
+    },
+    "reactions": [
+      {
+        "emoji": "🔥",
+        "count": 0
+      },
+      {
+        "emoji": "👍",
+        "count": 0
+      },
+      {
+        "emoji": "❤️",
+        "count": 0
+      },
+      {
+        "emoji": "🎉",
+        "count": 0
+      },
+      {
+        "emoji": "🚀",
+        "count": 0
+      }
+    ],
+    "comments": [],
+    "chapters": [
+      {
+        "title": "Start",
+        "time": 0
+      }
+    ]
+  },
+  {
+    "id": "5d69f281-9ff",
+    "title": "Grabación de Pantalla - 29 oct, 13:29",
+    "description": "Recorded with Loom Clone",
+    "filename": "1793298598420-1a5d27f3.webm",
+    "videoUrl": "/uploads/1793298598420-1a5d27f3.webm",
+    "thumbnail": "/uploads/1793298598437-3b9d55a2.jpg",
+    "duration": 8,
+    "durationFormatted": "00:08",
+    "size": 1939125,
+    "createdAt": "2026-10-29T18:29:58.440Z",
+    "views": 2,
+    "category": "videos",
+    "author": {
+      "name": "Samantha Vance",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      "role": "Creator"
+    },
+    "reactions": [
+      {
+        "emoji": "🔥",
+        "count": 0
+      },
+      {
+        "emoji": "👍",
+        "count": 0
+      },
+      {
+        "emoji": "❤️",
+        "count": 0
+      },
+      {
+        "emoji": "🎉",
+        "count": 0
+      },
+      {
+        "emoji": "🚀",
+        "count": 0
+      }
+    ],
+    "comments": [],
+    "chapters": [
+      {
+        "title": "Start",
+        "time": 0
+      }
+    ]
+  },
+  {
+    "id": "demo-loom-welcome",
+    "title": "Bienvenido a Loom Clone - Recorrido rápido 🚀",
+    "description": "Aprende cómo grabar tu pantalla y cámara, compartir enlaces al instante y colaborar con comentarios con marca de tiempo.",
+    "filename": "",
+    "demoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    "thumbnail": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+    "duration": 596,
+    "durationFormatted": "09:56",
+    "size": 15400000,
+    "createdAt": "2026-10-29T10:00:00.000Z",
+    "views": 42,
+    "author": {
+      "name": "Samantha Vance",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      "role": "Propietaria del espacio"
+    },
+    "category": "videos",
+    "reactions": [
+      {
+        "emoji": "🔥",
+        "count": 8
+      },
+      {
+        "emoji": "👍",
+        "count": 14
+      },
+      {
+        "emoji": "❤️",
+        "count": 6
+      },
+      {
+        "emoji": "🎉",
+        "count": 5
+      }
+    ],
+    "comments": [
+      {
+        "id": "c1",
+        "author": "Alex Rivera",
+        "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
+        "text": "¡La burbuja de la cámara web circular es súper fluida! Me encanta cómo se ve.",
+        "timestamp": 12,
+        "timestampFormatted": "00:12",
+        "createdAt": "2026-10-29T11:00:00.000Z"
+      },
+      {
+        "id": "c2",
+        "author": "Elena Rostova",
+        "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
+        "text": "¿Se pueden compartir los enlaces públicamente con cualquier persona? Sí, funciona de maravilla.",
+        "timestamp": 45,
+        "timestampFormatted": "00:45",
+        "createdAt": "2026-10-29T12:00:00.000Z"
+      }
+    ],
+    "chapters": [
+      {
+        "title": "Introducción y vista general",
+        "time": 0
+      },
+      {
+        "title": "Grabación de pantalla y cámara",
+        "time": 15
+      },
+      {
+        "title": "Compartir y colaborar",
+        "time": 48
+      }
+    ]
+  },
+  {
+    "id": "demo-loom-ui",
+    "title": "Demostración de Interfaz y Diseño Loom",
+    "description": "Breve actualización asíncrona de 3 minutos sobre el nuevo diseño flotante y los controles de video.",
+    "filename": "",
+    "demoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    "thumbnail": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+    "duration": 180,
+    "durationFormatted": "03:00",
+    "size": 8900000,
+    "createdAt": "2026-10-27T18:00:00.000Z",
+    "views": 19,
+    "author": {
+      "name": "Samantha Vance",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      "role": "Líder de Producto"
+    },
+    "category": "videos",
+    "reactions": [
+      {
+        "emoji": "🚀",
+        "count": 12
+      },
+      {
+        "emoji": "👍",
+        "count": 7
+      }
+    ],
+    "comments": [],
+    "chapters": []
+  }
+]

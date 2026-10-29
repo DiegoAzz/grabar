@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loom - Grabación de Pantalla y Mensajería de Video Asíncrona</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-[#f9fafb] text-[#1f2937] min-h-screen flex flex-col font-['Inter'] antialiased">
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
+  <header class="h-14 bg-white border-b border-gray-200 px-5 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center gap-6">
+      <!-- Logo Loom -->
+      <a href="/" class="flex items-center gap-2 font-bold text-xl tracking-tight text-gray-900 group">
+        <div class="w-8 h-8 rounded-lg bg-[#625df5] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <path d="M12 2a2 2 0 0 1 2 2v2.1a6.002 6.002 0 0 1 4.9 3.55l1.82-1.05a2 2 0 1 1 2 3.46l-1.82 1.05c.07.45.1 0.91.1 1.39s-.03.94-.1 1.39l1.82 1.05a2 2 0 1 1-2 3.46l-1.82-1.05A6.002 6.002 0 0 1 14 20.9V23a2 2 0 1 1-4 0v-2.1a6.002 6.002 0 0 1-4.9-3.55l-1.82 1.05a2 2 0 1 1-2-3.46l1.82-1.05A6.08 6.08 0 0 1 3 13.5c0-.48.03-.94.1-1.39L1.28 11.06a2 2 0 1 1 2-3.46l1.82 1.05A6.002 6.002 0 0 1 10 5.1V3a2 2 0 0 1 2-1zm0 7a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+          </svg>
+        </div>
+        <span class="font-['Outfit'] font-bold text-xl text-gray-900">Loom</span>
+      </a>
+
+      <!-- Buscador Universal -->
+      <div class="relative w-80 md:w-96">
+        <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input 
+          id="global-search-input"
+          type="text" 
+          placeholder="Buscar personas, etiquetas, carpetas, espacios y Looms" 
+          class="w-full bg-[#f3f4f6] text-sm text-gray-700 pl-9 pr-12 py-1.5 rounded-full border border-transparent focus:border-[#625df5] focus:bg-white focus:outline-none transition-all placeholder-gray-400"
+        />
+        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded border border-gray-300">Ctrl K</span>
+      </div>
+    </div>
+
+    <!-- Acciones Derecha -->
+    <div class="flex items-center gap-3">
+      <button id="open-record-widget-btn" class="flex items-center gap-2 bg-[#ff5745] hover:bg-[#f04836] text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm transition-all active:scale-95">
+        <i data-lucide="video" class="w-4 h-4"></i>
+        <span>Grabar un Loom</span>
+      </button>
+
+      <button class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative" title="Notificaciones">
+        <i data-lucide="bell" class="w-4 h-4"></i>
+        <span class="w-2 h-2 bg-[#625df5] rounded-full absolute top-1.5 right-1.5"></span>
+      </button>
+
+      <div class="flex items-center gap-2 pl-2 border-l border-gray-200">
+        <img 
+          src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80" 
+          alt="Samantha" 
+          class="w-7 h-7 rounded-full object-cover border border-purple-200"
+        />
+      </div>
+    </div>
+  </header>
+
+  <!-- DISEÑO PRINCIPAL -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- BARRA LATERAL IZQUIERDA -->
+    <aside class="w-64 bg-[#f8fafc] border-r border-gray-200 flex flex-col justify-between p-3 select-none shrink-0 overflow-y-auto">
+      <div>
+        <!-- Espacio de trabajo -->
+        <div class="p-2 rounded-xl hover:bg-gray-100 cursor-pointer flex items-center justify-between mb-2 transition-colors">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
+              S
+            </div>
+            <div>
+              <div class="text-sm font-semibold text-gray-800 leading-tight">Espacio de Samantha</div>
+              <div class="text-[11px] text-gray-500">1 miembro</div>
+            </div>
+          </div>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </div>
+
+        <!-- Invitar equipo -->
+        <button class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors mb-4">
+          <i data-lucide="user-plus" class="w-4 h-4 text-gray-500"></i>
+          <span>Invitar miembros de equipo</span>
+        </button>
+
+        <!-- Secciones de Biblioteca -->
+        <div class="space-y-1">
+          <div class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Biblioteca</div>
+          
+          <button class="nav-item active w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50/70 transition-colors" data-tab="videos">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="video" class="w-4 h-4"></i>
+              <span>Videos</span>
+            </div>
+            <span id="nav-video-count" class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-semibold">0</span>
+          </button>
+
+          <button class="nav-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors" data-tab="screenshots">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="camera" class="w-4 h-4"></i>
+              <span>Capturas de pantalla</span>
+            </div>
+          </button>
+
+          <button class="nav-item w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors" data-tab="archive">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="archive" class="w-4 h-4"></i>
+              <span>Archivo</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="mt-6 space-y-1">
+          <div class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Explorar</div>
+          
+          <button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            <i data-lucide="users" class="w-4 h-4 text-gray-400"></i>
+            <span>Compartido contigo</span>
+          </button>
+          
+          <button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            <i data-lucide="clock" class="w-4 h-4 text-gray-400"></i>
+            <span>Ver más tarde</span>
+          </button>
+
+          <button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            <i data-lucide="trash-2" class="w-4 h-4 text-gray-400"></i>
+            <span>Papelera</span>
+          </button>
+        </div>
+
+        <div class="mt-6 space-y-1">
+          <div class="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Administración</div>
+          <button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            <i data-lucide="shield-check" class="w-4 h-4 text-gray-400"></i>
+            <span>Gestionar usuarios</span>
+          </button>
+          <button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+            <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i>
+            <span>Ajustes del espacio</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tarjeta de estado de despliegue -->
+      <div class="p-3 bg-white border border-gray-200 rounded-xl shadow-2xs text-xs space-y-1.5">
+        <div class="flex items-center gap-1.5 font-semibold text-gray-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Listo para la Nube</span>
+        </div>
+        <p class="text-[11px] text-gray-500 leading-snug">Videos guardados en el servidor y respaldo local en IndexedDB.</p>
+      </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL: BIBLIOTECA DE VIDEOS -->
+    <main class="flex-1 overflow-y-auto p-8">
+      <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- Encabezado de sección -->
+        <div class="flex items-center justify-between border-b border-gray-200 pb-4">
+          <div>
+            <div class="text-xs font-medium text-gray-500">Biblioteca</div>
+            <h1 id="library-title" class="text-2xl font-bold text-gray-900 tracking-tight">Videos</h1>
+          </div>
+
+          <!-- Filtros secundarios -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center bg-white border border-gray-200 rounded-lg p-1 text-xs font-medium text-gray-600 shadow-2xs">
+              <button class="px-3 py-1 bg-gray-100 text-gray-900 rounded font-semibold">Todos los videos</button>
+              <button class="px-3 py-1 hover:text-gray-900">Creados por mí</button>
+            </div>
+
+            <button id="refresh-videos-btn" class="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors shadow-2xs" title="Actualizar biblioteca">
+              <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cuadrícula de tarjetas de video -->
+        <div id="video-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <!-- Se llena dinámicamente mediante app.js -->
+        </div>
+
+        <!-- Estado vacío -->
+        <div id="empty-state" class="hidden text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 p-8">
+          <div class="w-16 h-16 bg-indigo-50 text-[#625df5] rounded-full flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="video" class="w-8 h-8"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900">Aún no hay videos grabados</h3>
+          <p class="text-sm text-gray-500 mt-1 max-w-sm mx-auto">Haz clic en "Grabar un Loom" para capturar tu pantalla y la burbuja de cámara circular.</p>
+          <button id="empty-record-btn" class="mt-4 px-5 py-2.5 bg-[#ff5745] hover:bg-[#f04836] text-white text-sm font-semibold rounded-full shadow-sm transition-all inline-flex items-center gap-2">
+            <i data-lucide="video" class="w-4 h-4"></i>
+            <span>Comenzar a grabar ahora</span>
+          </button>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- WIDGET FLOTANTE DE GRABACIÓN (IDÉNTICO A LA IMAGEN) -->
+  <!-- ========================================================================= -->
+  <div id="loom-record-widget" class="loom-recorder-widget fixed right-8 top-20 p-4 select-none">
+    
+    <!-- Barra superior: Iconos de modo -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <button class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Inicio">
+          <i data-lucide="home" class="w-4 h-4"></i>
+        </button>
+        <button class="w-8 h-8 rounded-lg flex items-center justify-center text-[#60a5fa] bg-[#1e3a8a]/40 border border-[#3b82f6]/40 transition-colors" title="Grabar Video">
+          <i data-lucide="video" class="w-4 h-4"></i>
+        </button>
+        <button class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Captura de pantalla">
+          <i data-lucide="camera" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <button id="close-widget-btn" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors" title="Cerrar">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Selector de Objetivo de Grabación -->
+    <div class="mb-3">
+      <div class="bg-[#121418] border border-white/5 rounded-xl p-1 flex items-center text-xs">
+        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors" data-mode="tab">
+          Pestaña actual
+        </button>
+        <button class="mode-tab active flex-1 py-1.5 rounded-lg font-semibold text-center text-white bg-[#282d37] shadow-sm transition-colors" data-mode="screen">
+          Pantalla completa
+        </button>
+        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors" data-mode="window">
+          Ventana
+        </button>
+      </div>
+    </div>
+
+    <!-- Fila de Selección de Cámara -->
+    <div class="relative mb-3">
+      <div id="camera-selector-row" class="bg-[#282d37] hover:bg-[#323946] border border-white/10 rounded-xl px-3 py-2.5 flex items-center justify-between cursor-pointer transition-colors">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <i data-lucide="video" class="w-4 h-4 text-blue-400 shrink-0"></i>
+          <span id="selected-camera-label" class="text-xs font-medium text-gray-200 truncate">Cámara web detectada</span>
+        </div>
+        <button id="toggle-camera-btn" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+          Activada
+        </button>
+      </div>
+
+      <!-- SUB-MENÚ DE DISPOSITIVOS DE CÁMARA (Igual a la imagen) -->
+      <div id="camera-devices-popup" class="loom-subpopup hidden absolute -left-[275px] top-0 w-64 p-3 shadow-2xl">
+        <div class="space-y-1 mb-3">
+          <div class="device-opt flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-300 hover:bg-white/10 cursor-pointer" data-id="none">
+            <i data-lucide="video-off" class="w-4 h-4 text-red-400"></i>
+            <span>Sin cámara</span>
+          </div>
+          <div id="camera-devices-list" class="space-y-1">
+            <!-- Cámaras detectadas -->
+          </div>
+        </div>
+
+        <div class="bg-black/30 border border-white/5 rounded-lg p-2.5 text-[11px] text-gray-400 leading-tight">
+          <p>Tu cámara solo será visible en las páginas dentro del navegador Chrome. <a href="#" class="underline text-blue-400">Más información</a></p>
+          <button id="dismiss-tip-btn" class="mt-2 text-gray-400 hover:text-white font-medium text-[10px]">Descartar aviso</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fila de Selección de Micrófono con Onda de Sonido en Vivo -->
+    <div class="mb-4">
+      <div id="mic-selector-row" class="bg-[#282d37] hover:bg-[#323946] border border-white/10 rounded-xl px-3 py-2.5 flex items-center justify-between cursor-pointer transition-colors">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <i data-lucide="mic" class="w-4 h-4 text-gray-400 shrink-0"></i>
+          <span id="selected-mic-label" class="text-xs font-medium text-gray-200 truncate">Micrófono predeterminado</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Lienzo de la onda de audio animada en tiempo real -->
+          <canvas id="mic-audio-wave" width="60" height="20" class="audio-wave-canvas"></canvas>
+          <button id="toggle-mic-btn" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            Activado
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botón Grande Coral de Empezar a Grabar -->
+    <button id="start-recording-btn" class="w-full py-3 bg-[#ff5745] hover:bg-[#f04836] active:scale-[0.98] text-white rounded-xl font-semibold text-sm shadow-lg shadow-[#ff5745]/30 transition-all flex items-center justify-center gap-2">
+      <div class="w-2.5 h-2.5 rounded-full bg-white animate-ping"></div>
+      <span>Empezar a Grabar</span>
+    </button>
+
+    <!-- Límite de tiempo -->
+    <div class="text-center mt-2.5 mb-3">
+      <span class="text-[11px] text-gray-400 font-medium">Límite de grabación de 5 min</span>
+    </div>
+
+    <!-- Opciones inferiores (Efectos, Desenfoque, Más) -->
+    <div class="flex items-center justify-around border-t border-white/10 pt-3 text-xs text-gray-400">
+      <button id="toggle-effects-btn" class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+        <i data-lucide="sparkles" class="w-4 h-4"></i>
+        <span class="text-[10px]">Efectos</span>
+      </button>
+      <button id="toggle-blur-btn" class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+        <i data-lucide="gem" class="w-4 h-4"></i>
+        <span class="text-[10px]">Desenfoque</span>
+      </button>
+      <button id="more-options-btn" class="flex flex-col items-center gap-1 hover:text-white transition-colors">
+        <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+        <span class="text-[10px]">Más</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- BARRA DE CONTROL FLOTANTE IZQUIERDA (Píldora vertical de la imagen) -->
+  <!-- ========================================================================= -->
+  <div id="loom-floating-controls" class="loom-floating-bar fixed left-6 top-1/2 -translate-y-1/2 hidden select-none">
+    <!-- Botón rojo de detener y guardar -->
+    <button id="bar-stop-btn" class="stop-record-btn" title="Detener y guardar grabación">
+      <i data-lucide="square" class="w-4 h-4 fill-current"></i>
+    </button>
+
+    <!-- Contador de tiempo en vivo -->
+    <div id="bar-timer" class="text-[11px] font-bold text-white font-mono bg-black/40 px-1.5 py-0.5 rounded">
+      00:00
+    </div>
+
+    <!-- Pausar / Reanudar -->
+    <button id="bar-pause-btn" class="floating-btn" title="Pausar / Reanudar">
+      <i data-lucide="pause" class="w-4 h-4"></i>
+    </button>
+
+    <!-- Reiniciar grabación -->
+    <button id="bar-restart-btn" class="floating-btn" title="Reiniciar grabación">
+      <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+    </button>
+
+    <!-- Descartar / Papelera -->
+    <button id="bar-discard-btn" class="floating-btn danger" title="Descartar grabación">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>
+    </button>
+
+    <!-- Herramienta de lápiz de dibujo -->
+    <button id="bar-draw-btn" class="floating-btn" title="Anotar / Dibujar en pantalla">
+      <i data-lucide="pen-tool" class="w-4 h-4"></i>
+    </button>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- BURBUJA DE CÁMARA CIRCULAR FLOTANTE (Inferior Izquierda) -->
+  <!-- ========================================================================= -->
+  <div id="camera-bubble" class="loom-camera-bubble select-none">
+    <video id="webcam-preview-video" autoplay playsinline muted></video>
+
+    <!-- Controles al pasar el cursor -->
+    <div class="camera-bubble-controls">
+      <button id="bubble-size-btn" class="bubble-tool-btn" title="Cambiar tamaño de burbuja">
+        <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+      </button>
+      <button id="bubble-flip-btn" class="bubble-tool-btn" title="Girar vista espejo">
+        <i data-lucide="flip-horizontal" class="w-3.5 h-3.5"></i>
+      </button>
+      <button id="bubble-close-btn" class="bubble-tool-btn" title="Ocultar cámara">
+        <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- CUENTA REGRESIVA (3..2..1.. ¡YA!) -->
+  <!-- ========================================================================= -->
+  <div id="countdown-overlay" class="loom-countdown-overlay hidden">
+    <div id="countdown-digit" class="countdown-number">3</div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL DE GUARDADO Y SUBIDA -->
+  <!-- ========================================================================= -->
+  <div id="saving-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-[100002]">
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center space-y-4">
+      <div class="w-14 h-14 bg-indigo-50 text-[#625df5] rounded-full flex items-center justify-center mx-auto animate-spin">
+        <i data-lucide="loader-2" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-gray-900">Guardando tu video de Loom...</h3>
+        <p class="text-xs text-gray-500 mt-1">Codificando y subiendo el video a tu biblioteca de trabajo.</p>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div id="upload-progress-bar" class="bg-[#ff5745] h-full w-2/3 transition-all duration-300"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS -->
+  <script src="recorder.js"></script>
+  <script src="app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

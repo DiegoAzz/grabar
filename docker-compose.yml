@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  loom-app:
+    build: .
+    container_name: loom-clone
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
