@@ -34,7 +34,8 @@ async function saveVideoToIDB(videoObj, blob) {
 // State
 let currentVideos = [];
 let activeCategory = 'videos';
-let selectedRecordingMode = 'screen';
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+let selectedRecordingMode = isMobileDevice ? 'camera' : 'screen';
 let isCameraMenuOpen = false;
 
 // DOM Elements
@@ -426,7 +427,22 @@ async function toggleCamera() {
 
 // Setup Recording Controls & Handlers
 function setupRecordingControls() {
-  // Mode selection tabs (Current tab / Entire screen / Window)
+  // Mobile default tab selection
+  if (isMobileDevice) {
+    modeTabs.forEach(t => {
+      const isCam = t.getAttribute('data-mode') === 'camera';
+      t.classList.toggle('active', isCam);
+      t.classList.toggle('bg-[#282d37]', isCam);
+      t.classList.toggle('text-white', isCam);
+      t.classList.toggle('shadow-sm', isCam);
+      t.classList.toggle('font-semibold', isCam);
+      t.classList.toggle('text-gray-400', !isCam);
+      t.classList.toggle('font-medium', !isCam);
+    });
+    selectedRecordingMode = 'camera';
+  }
+
+  // Mode selection tabs (Current tab / Entire screen / Window / Camera)
   modeTabs.forEach(tab => {
     tab.addEventListener('click', () => {
       modeTabs.forEach(t => {
@@ -438,6 +454,56 @@ function setupRecordingControls() {
       selectedRecordingMode = tab.getAttribute('data-mode');
     });
   });
+
+  // Mobile Menu Drawer Toggle
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const sidebarNav = document.getElementById('sidebar-nav');
+  if (mobileMenuBtn && sidebarNav) {
+    mobileMenuBtn.addEventListener('click', () => {
+      sidebarNav.classList.toggle('hidden');
+    });
+  }
+
+  // Mobile Native Video Recording & File Upload
+  const mobileVideoInput = document.getElementById('mobile-video-input');
+  if (mobileVideoInput) {
+    mobileVideoInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      recordWidget.classList.add('hidden');
+      savingModal.classList.remove('hidden');
+      uploadProgressBar.style.width = '30%';
+
+      try {
+        const formData = new FormData();
+        const ext = file.name ? file.name.split('.').pop() : 'mp4';
+        formData.append('video', file, `mobile-${Date.now()}.${ext}`);
+        formData.append('title', `Video Móvil - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+        formData.append('category', activeCategory);
+
+        uploadProgressBar.style.width = '65%';
+
+        const res = await fetch('/api/videos/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        });
+        const data = await res.json();
+        uploadProgressBar.style.width = '100%';
+
+        if (data.success && data.video) {
+          window.location.href = `/v/${data.video.id}`;
+        } else {
+          throw new Error(data.error || 'Error al procesar el video subido');
+        }
+      } catch (uploadErr) {
+        alert("Error al subir el video: " + uploadErr.message);
+        savingModal.classList.add('hidden');
+        recordWidget.classList.remove('hidden');
+      }
+    });
+  }
 
   // Open/close recorder widget
   openWidgetBtn.addEventListener('click', () => recordWidget.classList.remove('hidden'));
@@ -462,8 +528,10 @@ function setupRecordingControls() {
     } catch (err) {
       console.warn("Start recording error:", err);
       recordWidget.classList.remove('hidden');
-      if (err.message && !err.message.includes("cancelada")) {
-        alert(err.message || "No se pudo iniciar la grabación. Por favor concede el permiso para capturar la pantalla.");
+      if (err.message === "SCREEN_NOT_SUPPORTED_ON_DEVICE") {
+        alert("En dispositivos iPhone/iPad, Apple no permite grabar la pantalla directamente desde el navegador web.\n\n👉 Puedes usar el modo 'Solo Cámara' para grabar tu mensaje de video, o grabar tu pantalla desde el Centro de Control de iOS y subir el video con el botón 'Grabar con Cámara del Móvil / Subir'.");
+      } else if (err.message && !err.message.includes("cancelada")) {
+        alert(err.message || "No se pudo iniciar la grabación.");
       }
     }
   });
@@ -497,12 +565,14 @@ function setupRecordingControls() {
 
       // Prepare FormData for backend
       const formData = new FormData();
-      formData.append('video', result.videoBlob, `appzgrabar-${Date.now()}.webm`);
+      const isMp4 = result.videoBlob.type && result.videoBlob.type.includes('mp4');
+      formData.append('video', result.videoBlob, `appzgrabar-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`);
       if (result.thumbnailBlob) {
         formData.append('thumbnail', result.thumbnailBlob, `thumb-${Date.now()}.jpg`);
       }
       formData.append('duration', result.duration);
-      formData.append('title', `Grabación de Pantalla - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
+      const titlePrefix = selectedRecordingMode === 'camera' ? 'Video Cámara' : 'Grabación de Pantalla';
+      formData.append('title', `${titlePrefix} - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
       formData.append('category', activeCategory);
 
       const res = await fetch('/api/videos/upload', {
@@ -666,6 +736,43 @@ function setupRecordingControls() {
       currentStroke = null;
       window.loomRecorder.currentStroke = null;
     });
+
+    // Touch support for drawing on mobile / tablets
+    drawCanvas.addEventListener('touchstart', (e) => {
+      if (!window.loomRecorder.isDrawingActive) return;
+      isPainting = true;
+      const t = e.touches[0];
+      currentStroke = {
+        color: drawColor,
+        width: 4,
+        points: [{ x: t.clientX, y: t.clientY }]
+      };
+      dCtx.beginPath();
+      dCtx.strokeStyle = drawColor;
+      dCtx.lineWidth = 4;
+      dCtx.lineCap = 'round';
+      dCtx.lineJoin = 'round';
+      dCtx.moveTo(t.clientX, t.clientY);
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isPainting || !currentStroke) return;
+      const t = e.touches[0];
+      currentStroke.points.push({ x: t.clientX, y: t.clientY });
+      dCtx.lineTo(t.clientX, t.clientY);
+      dCtx.stroke();
+      window.loomRecorder.currentStroke = currentStroke;
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      if (!isPainting) return;
+      isPainting = false;
+      if (currentStroke && currentStroke.points.length > 1) {
+        window.loomRecorder.drawStrokes.push(currentStroke);
+      }
+      currentStroke = null;
+      window.loomRecorder.currentStroke = null;
+    });
   }
 }
 
@@ -730,18 +837,17 @@ function setupCameraBubbleDragging() {
   cameraBubble.style.top = `${bubbleY}px`;
   cameraBubble.style.bottom = 'auto';
 
-  cameraBubble.addEventListener('mousedown', (e) => {
-    if (e.target.closest('.bubble-tool-btn')) return;
+  const startDragBubble = (clientX, clientY) => {
     isDragging = true;
-    startX = e.clientX - cameraBubble.offsetLeft;
-    startY = e.clientY - cameraBubble.offsetTop;
+    startX = clientX - cameraBubble.offsetLeft;
+    startY = clientY - cameraBubble.offsetTop;
     cameraBubble.style.transition = 'none';
-  });
+  };
 
-  window.addEventListener('mousemove', (e) => {
+  const moveDragBubble = (clientX, clientY) => {
     if (!isDragging) return;
-    let newX = e.clientX - startX;
-    let newY = e.clientY - startY;
+    let newX = clientX - startX;
+    let newY = clientY - startY;
 
     // Viewport bounds
     newX = Math.max(10, Math.min(window.innerWidth - cameraBubble.offsetWidth - 10, newX));
@@ -750,14 +856,34 @@ function setupCameraBubbleDragging() {
     cameraBubble.style.left = `${newX}px`;
     cameraBubble.style.top = `${newY}px`;
     window.loomRecorder.bubblePos = { x: newX + cameraBubble.offsetWidth / 2, y: newY + cameraBubble.offsetHeight / 2 };
-  });
+  };
 
-  window.addEventListener('mouseup', () => {
+  const endDragBubble = () => {
     if (isDragging) {
       isDragging = false;
       cameraBubble.style.transition = 'box-shadow 0.2s ease, width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
     }
+  };
+
+  cameraBubble.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.bubble-tool-btn')) return;
+    startDragBubble(e.clientX, e.clientY);
   });
+  window.addEventListener('mousemove', (e) => moveDragBubble(e.clientX, e.clientY));
+  window.addEventListener('mouseup', endDragBubble);
+
+  // Touch support for mobile phones
+  cameraBubble.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.bubble-tool-btn')) return;
+    const t = e.touches[0];
+    startDragBubble(t.clientX, t.clientY);
+  }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    const t = e.touches[0];
+    moveDragBubble(t.clientX, t.clientY);
+  }, { passive: true });
+  window.addEventListener('touchend', endDragBubble);
 
   // Bubble tools: size cycle (sm -> md -> lg)
   const sizes = ['size-sm', 'size-md', 'size-lg'];
@@ -770,11 +896,17 @@ function setupCameraBubbleDragging() {
     window.loomRecorder.bubbleSize = sizes[currentSizeIdx].replace('size-', '');
   });
 
-  // Flip mirror
-  bubbleFlipBtn.addEventListener('click', (e) => {
+  // Flip mirror (desktop) or Toggle Front/Rear Camera (mobile)
+  bubbleFlipBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    window.loomRecorder.isMirrored = !window.loomRecorder.isMirrored;
-    webcamPreviewVideo.style.transform = window.loomRecorder.isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+    if (isMobileDevice) {
+      const nextFacing = window.loomRecorder.facingMode === 'user' ? 'environment' : 'user';
+      await window.loomRecorder.startCameraPreview(webcamPreviewVideo, nextFacing);
+      showToast(nextFacing === 'user' ? "Cámara frontal activa" : "Cámara trasera activa");
+    } else {
+      window.loomRecorder.isMirrored = !window.loomRecorder.isMirrored;
+      webcamPreviewVideo.style.transform = window.loomRecorder.isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+    }
   });
 
   // Close bubble
@@ -791,32 +923,50 @@ function setupFloatingBarDragging() {
   let isDragging = false;
   let startX, startY;
 
-  bar.addEventListener('mousedown', (e) => {
-    if (e.target.closest('button')) return;
+  const startDragBar = (clientX, clientY) => {
     isDragging = true;
-    startX = e.clientX - bar.offsetLeft;
-    startY = e.clientY - bar.offsetTop;
+    startX = clientX - bar.offsetLeft;
+    startY = clientY - bar.offsetTop;
     bar.style.cursor = 'grabbing';
     bar.style.transition = 'none';
-  });
+  };
 
-  window.addEventListener('mousemove', (e) => {
+  const moveDragBar = (clientX, clientY) => {
     if (!isDragging) return;
-    let newX = e.clientX - startX;
-    let newY = e.clientY - startY;
+    let newX = clientX - startX;
+    let newY = clientY - startY;
     newX = Math.max(0, Math.min(window.innerWidth - bar.offsetWidth, newX));
     newY = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight, newY));
     bar.style.left = `${newX}px`;
     bar.style.top = `${newY}px`;
     bar.style.transform = 'none';
-  });
+  };
 
-  window.addEventListener('mouseup', () => {
+  const endDragBar = () => {
     if (isDragging) {
       isDragging = false;
       bar.style.cursor = 'default';
     }
+  };
+
+  bar.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return;
+    startDragBar(e.clientX, e.clientY);
   });
+  window.addEventListener('mousemove', (e) => moveDragBar(e.clientX, e.clientY));
+  window.addEventListener('mouseup', endDragBar);
+
+  bar.addEventListener('touchstart', (e) => {
+    if (e.target.closest('button')) return;
+    const t = e.touches[0];
+    startDragBar(t.clientX, t.clientY);
+  }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    const t = e.touches[0];
+    moveDragBar(t.clientX, t.clientY);
+  }, { passive: true });
+  window.addEventListener('touchend', endDragBar);
 }
 
 // Pop-out Floating Controls for Secondary Screen (Picture-in-Picture / Independent Window)

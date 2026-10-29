@@ -32,6 +32,7 @@ class LoomRecorder {
     this.bubbleSize = 'md'; // sm, md, lg
     this.isMirrored = true;
     this.isBlur = false;
+    this.facingMode = 'user'; // 'user' (selfie/frontal) or 'environment' (trasera)
     
     // Bubble coordinates
     this.bubblePos = { x: 40, y: window.innerHeight - 220 };
@@ -91,8 +92,13 @@ class LoomRecorder {
     }
   }
 
-  // Start Camera preview with resilient fallback
-  async startCameraPreview(previewVideoElem) {
+  // Start Camera preview with resilient fallback & mobile front/rear camera support
+  async startCameraPreview(previewVideoElem, facingMode = null) {
+    if (facingMode) {
+      this.facingMode = facingMode;
+      this.isMirrored = (facingMode === 'user');
+    }
+
     if (!this.cameraEnabled) {
       this.stopCameraPreview();
       return;
@@ -106,12 +112,16 @@ class LoomRecorder {
       let stream = null;
       try {
         const videoConstraints = this.selectedCameraId 
-          ? { deviceId: { ideal: this.selectedCameraId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { width: { ideal: 1280 }, height: { ideal: 720 } };
+          ? { deviceId: { ideal: this.selectedCameraId }, facingMode: this.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+          : { facingMode: this.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } };
         stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
       } catch (err1) {
-        console.warn("Standard camera constraint failed, falling back to simple video: true", err1);
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        console.warn("Standard camera constraint failed, falling back to simple facingMode", err1);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.facingMode }, audio: false });
+        } catch (err2) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
       }
 
       this.cameraStream = stream;
@@ -121,6 +131,7 @@ class LoomRecorder {
         previewVideoElem.srcObject = this.cameraStream;
         previewVideoElem.muted = true;
         previewVideoElem.setAttribute('playsinline', '');
+        previewVideoElem.setAttribute('webkit-playsinline', '');
         previewVideoElem.setAttribute('autoplay', '');
         await previewVideoElem.play().catch(e => console.warn("Camera play error:", e));
       }
@@ -229,10 +240,91 @@ class LoomRecorder {
     }
   }
 
-  // Start complete recording with screen + webcam composite
+  // Start complete recording with screen + webcam composite or camera-only mobile mode
   async startRecording(recordingMode = 'screen', onReadyCallback = null) {
     this.recordedChunks = [];
     this.recordDuration = 0;
+
+    // A. Camera-Only / Mobile Video Message Mode
+    if (recordingMode === 'camera') {
+      try {
+        if (!this.cameraStream || !this.cameraStream.active) {
+          await this.startCameraPreview(this.cameraVideoElem, this.facingMode);
+        }
+        if (!this.cameraStream || !this.cameraStream.active) {
+          throw new Error("No se pudo iniciar la cámara.");
+        }
+      } catch (camErr) {
+        console.error("Camera access error:", camErr);
+        throw new Error("Permiso de cámara denegado o no disponible en este dispositivo.");
+      }
+
+      // Prepare audio
+      if (this.micEnabled) {
+        try {
+          if (!this.audioStream || !this.audioStream.active) {
+            this.audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+          }
+        } catch (micErr) {
+          console.warn("Microphone access failed for camera recording:", micErr);
+        }
+      }
+
+      // Execute countdown callback
+      if (onReadyCallback && typeof onReadyCallback === 'function') {
+        try {
+          await onReadyCallback();
+        } catch (cbErr) {
+          console.warn("Ready callback error:", cbErr);
+        }
+      }
+
+      const camVideoTrack = this.cameraStream.getVideoTracks()[0];
+      const audioTracks = (this.micEnabled && this.audioStream) ? this.audioStream.getAudioTracks() : [];
+      this.combinedStream = new MediaStream([camVideoTrack, ...audioTracks]);
+
+      let mimeType = 'video/webm;codecs=vp9,opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/mp4'; // iOS Safari compatibility
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = '';
+            }
+          }
+        }
+      }
+
+      const options = mimeType ? { mimeType } : undefined;
+      this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
+
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.recordedChunks.push(e.data);
+        }
+      };
+
+      this.mediaRecorder.start(1000);
+      this.isRecording = true;
+      this.isPaused = false;
+
+      this.timerInterval = setInterval(() => {
+        if (!this.isPaused) {
+          this.recordDuration++;
+          if (this.onDurationUpdate) this.onDurationUpdate(this.recordDuration);
+        }
+      }, 1000);
+
+      if (this.onStateChange) this.onStateChange({ isRecording: true, isPaused: false });
+      return;
+    }
+
+    // B. Screen / Window / Tab Mode
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      throw new Error("SCREEN_NOT_SUPPORTED_ON_DEVICE");
+    }
 
     // 1. Get Screen Stream (with modern surface hints and resilient fallback)
     try {
@@ -394,9 +486,12 @@ class LoomRecorder {
     if (!MediaRecorder.isTypeSupported(mimeType)) {
       mimeType = 'video/webm;codecs=vp8,opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm';
+        mimeType = 'video/mp4';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = '';
+          mimeType = 'video/webm';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = '';
+          }
         }
       }
     }
@@ -643,6 +738,8 @@ class LoomRecorder {
             tCtx.drawImage(this.compositeCanvas, 0, 0, 640, 360);
           } else if (this.screenVideoElem && this.screenVideoElem.videoWidth > 0) {
             tCtx.drawImage(this.screenVideoElem, 0, 0, 640, 360);
+          } else if (this.cameraVideoElem && this.cameraVideoElem.videoWidth > 0) {
+            tCtx.drawImage(this.cameraVideoElem, 0, 0, 640, 360);
           }
           thumbBlob = await new Promise(r => thumbCanvas.toBlob(r, 'image/jpeg', 0.85));
         } catch (e) {

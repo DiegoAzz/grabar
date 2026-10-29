@@ -18,8 +18,13 @@
 <body class="bg-[#f9fafb] text-[#1f2937] min-h-screen flex flex-col font-['Inter'] antialiased">
 
   <!-- BARRA DE NAVEGACIÓN SUPERIOR -->
-  <header class="h-14 bg-white border-b border-gray-200 px-5 flex items-center justify-between sticky top-0 z-40">
-    <div class="flex items-center gap-6">
+  <header class="h-14 bg-white border-b border-gray-200 px-3 sm:px-5 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center gap-3 sm:gap-6">
+      <!-- Botón Menú Móvil -->
+      <button id="mobile-menu-btn" class="md:hidden p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
       <!-- Logo AppzGrabar -->
       <a href="/" class="flex items-center gap-2 font-bold text-xl tracking-tight text-gray-900 group">
         <div class="w-8 h-8 rounded-lg bg-[#625df5] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform">
@@ -27,27 +32,27 @@
             <path d="M12 2a2 2 0 0 1 2 2v2.1a6.002 6.002 0 0 1 4.9 3.55l1.82-1.05a2 2 0 1 1 2 3.46l-1.82 1.05c.07.45.1 0.91.1 1.39s-.03.94-.1 1.39l1.82 1.05a2 2 0 1 1-2 3.46l-1.82-1.05A6.002 6.002 0 0 1 14 20.9V23a2 2 0 1 1-4 0v-2.1a6.002 6.002 0 0 1-4.9-3.55l-1.82 1.05a2 2 0 1 1-2-3.46l1.82-1.05A6.08 6.08 0 0 1 3 13.5c0-.48.03-.94.1-1.39L1.28 11.06a2 2 0 1 1 2-3.46l1.82 1.05A6.002 6.002 0 0 1 10 5.1V3a2 2 0 0 1 2-1zm0 7a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
           </svg>
         </div>
-        <span class="font-['Outfit'] font-bold text-xl text-gray-900">AppzGrabar</span>
+        <span class="font-['Outfit'] font-bold text-lg sm:text-xl text-gray-900">AppzGrabar</span>
       </a>
 
       <!-- Buscador Universal -->
-      <div class="relative w-80 md:w-96">
+      <div class="hidden md:block relative w-64 lg:w-80">
         <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
         <input 
           id="global-search-input"
           type="text" 
-          placeholder="Buscar personas, etiquetas, carpetas, espacios y grabaciones" 
-          class="w-full bg-[#f3f4f6] text-sm text-gray-700 pl-9 pr-12 py-1.5 rounded-full border border-transparent focus:border-[#625df5] focus:bg-white focus:outline-none transition-all placeholder-gray-400"
+          placeholder="Buscar videos, etiquetas..." 
+          class="w-full bg-[#f3f4f6] text-sm text-gray-700 pl-9 pr-10 py-1.5 rounded-full border border-transparent focus:border-[#625df5] focus:bg-white focus:outline-none transition-all placeholder-gray-400"
         />
-        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded border border-gray-300">Ctrl K</span>
       </div>
     </div>
 
     <!-- Acciones Derecha -->
-    <div class="flex items-center gap-3">
-      <button id="open-record-widget-btn" class="flex items-center gap-2 bg-[#ff5745] hover:bg-[#f04836] text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm transition-all active:scale-95">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <button id="open-record-widget-btn" class="flex items-center gap-1.5 bg-[#ff5745] hover:bg-[#f04836] text-white px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm transition-all active:scale-95 shrink-0">
         <i data-lucide="video" class="w-4 h-4"></i>
-        <span>Grabar en AppzGrabar</span>
+        <span class="hidden sm:inline">Grabar en AppzGrabar</span>
+        <span class="sm:hidden">Grabar</span>
       </button>
 
       <button class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative" title="Notificaciones">
@@ -98,7 +103,7 @@
   <div class="flex-1 flex overflow-hidden">
     
     <!-- BARRA LATERAL IZQUIERDA -->
-    <aside class="w-64 bg-[#f8fafc] border-r border-gray-200 flex flex-col justify-between p-3 select-none shrink-0 overflow-y-auto">
+    <aside id="sidebar-nav" class="hidden md:flex w-64 bg-[#f8fafc] border-r border-gray-200 flex-col justify-between p-3 select-none shrink-0 overflow-y-auto fixed md:static inset-y-14 left-0 z-30 shadow-xl md:shadow-none bg-white md:bg-[#f8fafc]">
       <div>
         <!-- Espacio de trabajo -->
         <div class="p-2 rounded-xl hover:bg-gray-100 cursor-pointer flex items-center justify-between mb-2 transition-colors">
@@ -237,9 +242,9 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- WIDGET FLOTANTE DE GRABACIÓN (IDÉNTICO A LA IMAGEN) -->
+  <!-- WIDGET FLOTANTE DE GRABACIÓN (RESPONSIVE MÓVIL Y DESKTOP) -->
   <!-- ========================================================================= -->
-  <div id="loom-record-widget" class="loom-recorder-widget fixed right-8 top-20 p-4 select-none">
+  <div id="loom-record-widget" class="loom-recorder-widget fixed inset-x-3 top-16 sm:inset-x-auto sm:right-8 sm:top-20 sm:w-80 p-4 select-none z-50 shadow-2xl">
     
     <!-- Barra superior: Iconos de modo -->
     <div class="flex items-center justify-between mb-4">
@@ -259,16 +264,16 @@
       </button>
     </div>
 
-    <!-- Selector de Objetivo de Grabación -->
+    <!-- Selector de Objetivo de Grabación (Pantalla / Solo Cámara Móvil / Ventana) -->
     <div class="mb-3">
       <div class="bg-[#121418] border border-white/5 rounded-xl p-1 flex items-center text-xs">
-        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors" data-mode="tab">
-          Pestaña actual
-        </button>
         <button class="mode-tab active flex-1 py-1.5 rounded-lg font-semibold text-center text-white bg-[#282d37] shadow-sm transition-colors" data-mode="screen">
-          Pantalla completa
+          Pantalla
         </button>
-        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors" data-mode="window">
+        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors" data-mode="camera">
+          Solo Cámara
+        </button>
+        <button class="mode-tab flex-1 py-1.5 rounded-lg font-medium text-center text-gray-400 hover:text-white transition-colors hidden sm:block" data-mode="window">
           Ventana
         </button>
       </div>
@@ -279,15 +284,15 @@
       <div id="camera-selector-row" class="bg-[#282d37] hover:bg-[#323946] border border-white/10 rounded-xl px-3 py-2.5 flex items-center justify-between cursor-pointer transition-colors">
         <div class="flex items-center gap-2.5 overflow-hidden">
           <i data-lucide="video" class="w-4 h-4 text-blue-400 shrink-0"></i>
-          <span id="selected-camera-label" class="text-xs font-medium text-gray-200 truncate">Cámara web detectada</span>
+          <span id="selected-camera-label" class="text-xs font-medium text-gray-200 truncate">Cámara detectada</span>
         </div>
-        <button id="toggle-camera-btn" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <button id="toggle-camera-btn" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
           Activada
         </button>
       </div>
 
-      <!-- SUB-MENÚ DE DISPOSITIVOS DE CÁMARA (Igual a la imagen) -->
-      <div id="camera-devices-popup" class="loom-subpopup hidden absolute -left-[275px] top-0 w-64 p-3 shadow-2xl">
+      <!-- SUB-MENÚ DE DISPOSITIVOS DE CÁMARA (Compatible con Móvil) -->
+      <div id="camera-devices-popup" class="loom-subpopup hidden absolute left-0 sm:-left-[275px] top-full sm:top-0 w-full sm:w-64 p-3 shadow-2xl z-50 mt-1 sm:mt-0">
         <div class="space-y-1 mb-3">
           <div class="device-opt flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-300 hover:bg-white/10 cursor-pointer" data-id="none">
             <i data-lucide="video-off" class="w-4 h-4 text-red-400"></i>
@@ -299,8 +304,8 @@
         </div>
 
         <div class="bg-black/30 border border-white/5 rounded-lg p-2.5 text-[11px] text-gray-400 leading-tight">
-          <p>Tu cámara solo será visible en las páginas dentro del navegador Chrome. <a href="#" class="underline text-blue-400">Más información</a></p>
-          <button id="dismiss-tip-btn" class="mt-2 text-gray-400 hover:text-white font-medium text-[10px]">Descartar aviso</button>
+          <p>En teléfonos móviles puedes alternar entre cámara frontal (selfie) y trasera. <a href="#" class="underline text-blue-400">Más info</a></p>
+          <button id="dismiss-tip-btn" class="mt-2 text-gray-400 hover:text-white font-medium text-[10px]">Descartar</button>
         </div>
       </div>
     </div>
@@ -310,11 +315,10 @@
       <div id="mic-selector-row" class="bg-[#282d37] hover:bg-[#323946] border border-white/10 rounded-xl px-3 py-2.5 flex items-center justify-between cursor-pointer transition-colors">
         <div class="flex items-center gap-2.5 overflow-hidden">
           <i data-lucide="mic" class="w-4 h-4 text-gray-400 shrink-0"></i>
-          <span id="selected-mic-label" class="text-xs font-medium text-gray-200 truncate">Micrófono predeterminado</span>
+          <span id="selected-mic-label" class="text-xs font-medium text-gray-200 truncate">Micrófono</span>
         </div>
-        <div class="flex items-center gap-2">
-          <!-- Lienzo de la onda de audio animada en tiempo real -->
-          <canvas id="mic-audio-wave" width="60" height="20" class="audio-wave-canvas"></canvas>
+        <div class="flex items-center gap-2 shrink-0">
+          <canvas id="mic-audio-wave" width="50" height="18" class="audio-wave-canvas"></canvas>
           <button id="toggle-mic-btn" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
             Activado
           </button>
@@ -329,9 +333,19 @@
     </button>
 
     <!-- Límite de tiempo -->
-    <div class="text-center mt-2.5 mb-3">
+    <div class="text-center mt-2.5 mb-2">
       <span class="text-[11px] text-gray-400 font-medium">Límite de grabación de 5 min</span>
     </div>
+
+    <!-- Opción móvil nativa: Grabar con Cámara de Teléfono o Subir desde Galería -->
+    <div class="pt-2.5 border-t border-white/10">
+      <label for="mobile-video-input" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-white/10 hover:bg-white/15 active:bg-white/20 text-gray-200 rounded-xl text-xs font-semibold cursor-pointer transition-all border border-white/10">
+        <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400"></i>
+        <span>Grabar con Cámara del Móvil / Subir</span>
+      </label>
+      <input type="file" id="mobile-video-input" accept="video/*" class="hidden" />
+    </div>
+  </div>
 
     <!-- Opciones inferiores (Efectos, Desenfoque, Más) -->
     <div class="flex items-center justify-around border-t border-white/10 pt-3 text-xs text-gray-400">
@@ -352,9 +366,9 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- BARRA DE CONTROL FLOTANTE IZQUIERDA (Píldora vertical de la imagen) -->
+  <!-- BARRA DE CONTROL FLOTANTE (RESPONSIVE INFERIOR EN MÓVIL / LATERAL EN DESKTOP) -->
   <!-- ========================================================================= -->
-  <div id="loom-floating-controls" class="loom-floating-bar fixed left-6 top-1/2 -translate-y-1/2 hidden select-none">
+  <div id="loom-floating-controls" class="loom-floating-bar fixed bottom-6 left-1/2 -translate-x-1/2 md:bottom-auto md:left-6 md:top-1/2 md:-translate-y-1/2 hidden select-none z-50">
     <!-- Botón rojo de detener y guardar -->
     <button id="bar-stop-btn" class="stop-record-btn" title="Detener y guardar grabación">
       <i data-lucide="square" class="w-4 h-4 fill-current"></i>
