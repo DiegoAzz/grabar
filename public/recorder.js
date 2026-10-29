@@ -47,6 +47,7 @@ class LoomRecorder {
     this.compositeCanvas = null;
     this.compositeCtx = null;
     this.compositeAnimFrame = null;
+    this.compositorWorker = null;
     this.screenVideoElem = null;
     this.cameraVideoElem = null;
     this.isCompositing = false;
@@ -229,33 +230,53 @@ class LoomRecorder {
   }
 
   // Start complete recording with screen + webcam composite
-  async startRecording(recordingMode = 'screen') {
+  async startRecording(recordingMode = 'screen', onReadyCallback = null) {
     this.recordedChunks = [];
     this.recordDuration = 0;
 
-    // 1. Get Screen Stream (with resilient fallback for system audio)
+    // 1. Get Screen Stream (with modern surface hints and resilient fallback)
     try {
-      try {
-        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+      const getOptions = (includeAudio) => {
+        const opts = {
           video: {
-            displaySurface: recordingMode === 'window' ? 'window' : (recordingMode === 'tab' ? 'browser' : 'monitor'),
             cursor: 'always'
           },
-          audio: true
-        });
+          audio: includeAudio
+        };
+        if (recordingMode === 'window') {
+          opts.video.displaySurface = 'window';
+        } else if (recordingMode === 'tab') {
+          opts.video.displaySurface = 'browser';
+        } else {
+          opts.video.displaySurface = 'monitor';
+        }
+
+        // Avoid capturing the current AppzGrabar tab by default when user wants window/screen
+        opts.preferCurrentTab = (recordingMode === 'tab');
+        opts.selfBrowserSurface = (recordingMode === 'tab') ? 'include' : 'exclude';
+        opts.surfaceSwitching = 'include';
+        opts.systemAudio = includeAudio ? 'include' : 'exclude';
+        return opts;
+      };
+
+      try {
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia(getOptions(true));
       } catch (audioErr) {
         console.warn("Screen capture with system audio not supported or denied, falling back to video-only capture:", audioErr);
-        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            displaySurface: recordingMode === 'window' ? 'window' : (recordingMode === 'tab' ? 'browser' : 'monitor'),
-            cursor: 'always'
-          },
-          audio: false
-        });
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia(getOptions(false));
       }
     } catch (err) {
       console.error("Screen capture cancelled or denied:", err);
       throw new Error("Captura de pantalla cancelada o permiso denegado.");
+    }
+
+    // Now that the user selected their screen/window, execute any preparatory callback (e.g. 3..2..1 countdown)
+    if (onReadyCallback && typeof onReadyCallback === 'function') {
+      try {
+        await onReadyCallback();
+      } catch (cbErr) {
+        console.warn("Ready callback error:", cbErr);
+      }
     }
 
     // Handle user clicking "Stop sharing" on browser native ribbon
@@ -271,15 +292,24 @@ class LoomRecorder {
     }
 
     // 2. Prepare screen video element ATTACHED TO DOM for active GPU rendering
-    if (!this.screenVideoElem) {
-      this.screenVideoElem = document.createElement('video');
-      this.screenVideoElem.id = 'loom-internal-screen-stream';
-      this.screenVideoElem.setAttribute('playsinline', '');
-      this.screenVideoElem.setAttribute('autoplay', '');
-      this.screenVideoElem.muted = true;
-      this.screenVideoElem.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:320px;height:180px;opacity:0;pointer-events:none;z-index:-99999;';
-      document.body.appendChild(this.screenVideoElem);
+    // Remove any previous element to guarantee a fresh stream with no frozen frames
+    if (this.screenVideoElem) {
+      try {
+        this.screenVideoElem.pause();
+        this.screenVideoElem.srcObject = null;
+        this.screenVideoElem.remove();
+      } catch (e) {}
+      this.screenVideoElem = null;
     }
+
+    this.screenVideoElem = document.createElement('video');
+    this.screenVideoElem.id = 'loom-internal-screen-stream';
+    this.screenVideoElem.setAttribute('playsinline', '');
+    this.screenVideoElem.setAttribute('autoplay', '');
+    this.screenVideoElem.muted = true;
+    // Keep it in DOM with slight opacity so Chrome's GPU compositor decodes all frames even in background
+    this.screenVideoElem.style.cssText = 'position:fixed;bottom:0;right:0;width:4px;height:4px;opacity:0.01;pointer-events:none;z-index:-999;';
+    document.body.appendChild(this.screenVideoElem);
 
     this.screenVideoElem.srcObject = this.screenStream;
 
@@ -295,7 +325,7 @@ class LoomRecorder {
       this.screenVideoElem.onloadedmetadata = () => {
         this.screenVideoElem.play().then(done).catch(done);
       };
-      setTimeout(done, 600);
+      setTimeout(done, 500);
     });
 
     const trackSettings = screenTrack ? screenTrack.getSettings() : {};
@@ -314,7 +344,7 @@ class LoomRecorder {
     let videoTrackToRecord;
 
     if (hasLiveCamera) {
-      // 4. Start compositor loop: draws screen + circular webcam + annotations
+      // 4. Start compositor loop with background worker: draws screen + circular webcam + annotations
       this.isCompositing = true;
       this.startCanvasCompositor(screenWidth, screenHeight);
       const canvasStream = this.compositeCanvas.captureStream(30);
@@ -405,30 +435,74 @@ class LoomRecorder {
   }
 
   // Draw screen + circular camera bubble in real time onto canvas
+  // Background-proof: uses requestAnimationFrame for foreground + Web Worker ticker for background tabs
   startCanvasCompositor(width, height) {
     const ctx = this.compositeCtx;
 
-    const render = () => {
+    const renderFrame = () => {
       if (!this.isRecording || !this.isCompositing) return;
-      this.compositeAnimFrame = requestAnimationFrame(render);
 
-      // Draw screen
-      if (this.screenVideoElem) {
+      const curW = this.screenVideoElem ? (this.screenVideoElem.videoWidth || width) : width;
+      const curH = this.screenVideoElem ? (this.screenVideoElem.videoHeight || height) : height;
+
+      if (this.compositeCanvas.width !== curW || this.compositeCanvas.height !== curH) {
+        this.compositeCanvas.width = curW;
+        this.compositeCanvas.height = curH;
+      }
+
+      // Draw active screen / window
+      if (this.screenVideoElem && this.screenVideoElem.readyState >= 1) {
         try {
-          ctx.drawImage(this.screenVideoElem, 0, 0, width, height);
+          ctx.drawImage(this.screenVideoElem, 0, 0, curW, curH);
         } catch (e) {}
       }
 
       // Draw active annotations if any
-      this.drawAnnotationsOnCanvas(ctx, width, height);
+      this.drawAnnotationsOnCanvas(ctx, curW, curH);
 
       // Draw Draggable Circular Webcam Bubble
       if (this.cameraEnabled && this.cameraVideoElem && this.cameraVideoElem.readyState >= 1) {
-        this.drawCameraBubbleOnCanvas(ctx, width, height);
+        this.drawCameraBubbleOnCanvas(ctx, curW, curH);
       }
     };
 
-    render();
+    // 1. Web Worker ticker ensures rendering NEVER stops when user focuses another window/tab
+    try {
+      if (this.compositorWorker) {
+        try { this.compositorWorker.terminate(); } catch (e) {}
+      }
+      const workerBlob = new Blob([`
+        let id = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            if (id) clearInterval(id);
+            id = setInterval(() => { postMessage('tick'); }, 33);
+          } else if (e.data === 'stop') {
+            if (id) clearInterval(id);
+            id = null;
+          }
+        };
+      `], { type: 'application/javascript' });
+      this.compositorWorker = new Worker(URL.createObjectURL(workerBlob));
+      this.compositorWorker.onmessage = () => {
+        if (document.hidden) {
+          renderFrame();
+        }
+      };
+      this.compositorWorker.postMessage('start');
+    } catch (workerErr) {
+      console.warn("Worker compositor ticker fallback:", workerErr);
+    }
+
+    // 2. High-performance requestAnimationFrame loop for foreground
+    const animLoop = () => {
+      if (!this.isRecording || !this.isCompositing) return;
+      this.compositeAnimFrame = requestAnimationFrame(animLoop);
+      if (!document.hidden) {
+        renderFrame();
+      }
+    };
+    this.compositeAnimFrame = requestAnimationFrame(animLoop);
   }
 
   drawCameraBubbleOnCanvas(ctx, canvasW, canvasH) {
@@ -630,6 +704,13 @@ class LoomRecorder {
   }
 
   cleanupStreams() {
+    if (this.compositorWorker) {
+      try {
+        this.compositorWorker.postMessage('stop');
+        this.compositorWorker.terminate();
+      } catch (e) {}
+      this.compositorWorker = null;
+    }
     if (this.screenStream) {
       this.screenStream.getTracks().forEach(t => t.stop());
       this.screenStream = null;
@@ -639,8 +720,12 @@ class LoomRecorder {
       this.combinedStream = null;
     }
     if (this.screenVideoElem) {
-      this.screenVideoElem.pause();
-      this.screenVideoElem.srcObject = null;
+      try {
+        this.screenVideoElem.pause();
+        this.screenVideoElem.srcObject = null;
+        this.screenVideoElem.remove();
+      } catch (e) {}
+      this.screenVideoElem = null;
     }
     if (this.mixAudioContext && this.mixAudioContext.state !== 'closed') {
       try { this.mixAudioContext.close(); } catch (e) {}

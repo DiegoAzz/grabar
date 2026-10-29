@@ -448,20 +448,21 @@ function setupRecordingControls() {
       // 1. Hide configuration widget
       recordWidget.classList.add('hidden');
 
-      // 2. Run 3..2..1 Countdown
-      await runCountdown();
+      // 2. Start Recording Engine (prompts window/screen picker FIRST, then runs 3..2..1 countdown)
+      await window.loomRecorder.startRecording(selectedRecordingMode, async () => {
+        await runCountdown();
+      });
 
-      // 3. Start Recording Engine
-      await window.loomRecorder.startRecording(selectedRecordingMode);
-
-      // 4. Show left floating control bar
+      // 3. Show left floating control bar
       floatingControls.classList.remove('hidden');
       updateTimerDisplay(0);
 
     } catch (err) {
       console.warn("Start recording error:", err);
       recordWidget.classList.remove('hidden');
-      alert(err.message || "No se pudo iniciar la grabación. Por favor concede el permiso para capturar la pantalla.");
+      if (err.message && !err.message.includes("cancelada")) {
+        alert(err.message || "No se pudo iniciar la grabación. Por favor concede el permiso para capturar la pantalla.");
+      }
     }
   });
 
@@ -548,8 +549,9 @@ function setupRecordingControls() {
     if (confirm("¿Reiniciar la grabación desde el principio? La grabación actual se descartará.")) {
       window.loomRecorder.discardRecording();
       floatingControls.classList.add('hidden');
-      await runCountdown();
-      await window.loomRecorder.startRecording(selectedRecordingMode);
+      await window.loomRecorder.startRecording(selectedRecordingMode, async () => {
+        await runCountdown();
+      });
       floatingControls.classList.remove('hidden');
     }
   });
