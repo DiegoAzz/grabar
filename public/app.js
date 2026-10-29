@@ -72,6 +72,7 @@ const barPauseBtn = document.getElementById('bar-pause-btn');
 const barRestartBtn = document.getElementById('bar-restart-btn');
 const barDiscardBtn = document.getElementById('bar-discard-btn');
 const barDrawBtn = document.getElementById('bar-draw-btn');
+const barPipBtn = document.getElementById('bar-pip-btn');
 
 const cameraBubble = document.getElementById('camera-bubble');
 const webcamPreviewVideo = document.getElementById('webcam-preview-video');
@@ -567,6 +568,13 @@ function setupRecordingControls() {
     }
   });
 
+  // Pop-out Floating Controls to Secondary Screen
+  if (barPipBtn) {
+    barPipBtn.addEventListener('click', () => {
+      togglePictureInPicture();
+    });
+  }
+
   // Draw pen tool toggle & Drawing engine
   const drawPalette = document.getElementById('draw-palette');
   const drawCanvas = document.getElementById('drawing-canvas-overlay');
@@ -809,6 +817,99 @@ function setupFloatingBarDragging() {
       bar.style.cursor = 'default';
     }
   });
+}
+
+// Pop-out Floating Controls for Secondary Screen (Picture-in-Picture / Independent Window)
+async function togglePictureInPicture() {
+  if (window.pipWindow) {
+    try { window.pipWindow.close(); } catch (e) {}
+    window.pipWindow = null;
+    return;
+  }
+
+  if ('documentPictureInPicture' in window) {
+    try {
+      const pipWindow = await window.documentPictureInPicture.requestWindow({
+        width: 180,
+        height: 240,
+      });
+      window.pipWindow = pipWindow;
+
+      pipWindow.document.title = "AppzGrabar Flotante";
+      pipWindow.document.body.style.cssText = "margin:0;padding:12px;background:#181a20;color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;box-sizing:border-box;user-select:none;";
+
+      pipWindow.document.body.innerHTML = `
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">AppzGrabar</div>
+        <div id="pip-timer" style="font-size:22px;font-weight:800;font-family:monospace;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);padding:4px 14px;border-radius:8px;margin-bottom:12px;">00:00</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <button id="pip-stop-btn" style="background:#ef4444;border:none;width:44px;height:44px;border-radius:12px;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(239,68,68,0.4);" title="Detener y Guardar">⏹️</button>
+          <button id="pip-pause-btn" style="background:#27272a;border:1px solid rgba(255,255,255,0.15);width:38px;height:38px;border-radius:10px;color:white;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Pausar">⏸️</button>
+          <button id="pip-restart-btn" style="background:#27272a;border:1px solid rgba(255,255,255,0.15);width:38px;height:38px;border-radius:10px;color:white;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Reiniciar">🔄</button>
+        </div>
+        <div style="font-size:10px;color:#9ca3af;text-align:center;line-height:1.2;">Mueve esta ventana libremente a tu pantalla 2</div>
+      `;
+
+      const pipStop = pipWindow.document.getElementById('pip-stop-btn');
+      const pipPause = pipWindow.document.getElementById('pip-pause-btn');
+      const pipRestart = pipWindow.document.getElementById('pip-restart-btn');
+      const pipTimer = pipWindow.document.getElementById('pip-timer');
+
+      pipStop.addEventListener('click', () => {
+        barStopBtn.click();
+        if (pipWindow) pipWindow.close();
+      });
+
+      pipPause.addEventListener('click', () => {
+        barPauseBtn.click();
+        pipPause.textContent = window.loomRecorder.isPaused ? '▶️' : '⏸️';
+      });
+
+      pipRestart.addEventListener('click', () => {
+        barRestartBtn.click();
+      });
+
+      const updatePipTimer = () => {
+        if (pipTimer && barTimer) {
+          pipTimer.textContent = barTimer.textContent;
+        }
+      };
+
+      const pipTimerInterval = setInterval(updatePipTimer, 500);
+
+      pipWindow.addEventListener('pagehide', () => {
+        clearInterval(pipTimerInterval);
+        window.pipWindow = null;
+      });
+
+      showToast("Ventana flotante abierta: ¡Arrástrala a tu segunda pantalla!");
+      return;
+    } catch (err) {
+      console.warn("Document Picture-in-Picture fallback:", err);
+    }
+  }
+
+  // Fallback: Popup window
+  const pop = window.open('', 'AppzGrabarFloat', 'width=200,height=240,resizable=no');
+  if (pop) {
+    pop.document.title = "AppzGrabar Flotante";
+    pop.document.body.style.cssText = "margin:0;padding:12px;background:#181a20;color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;box-sizing:border-box;";
+    pop.document.body.innerHTML = `
+      <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px;">AppzGrabar</div>
+      <div id="pop-timer" style="font-size:22px;font-weight:800;font-family:monospace;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);padding:4px 14px;border-radius:8px;margin-bottom:12px;">00:00</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="pop-stop" style="background:#ef4444;border:none;width:44px;height:44px;border-radius:12px;color:white;font-size:16px;cursor:pointer;">⏹️</button>
+        <button id="pop-pause" style="background:#27272a;border:1px solid rgba(255,255,255,0.15);width:38px;height:38px;border-radius:10px;color:white;font-size:14px;cursor:pointer;">⏸️</button>
+      </div>
+      <div style="font-size:10px;color:#9ca3af;margin-top:8px;">Arrástrame a tu pantalla 2</div>
+    `;
+    pop.document.getElementById('pop-stop').onclick = () => { barStopBtn.click(); pop.close(); };
+    pop.document.getElementById('pop-pause').onclick = () => { barPauseBtn.click(); };
+    setInterval(() => {
+      const pt = pop.document.getElementById('pop-timer');
+      if (pt && barTimer) pt.textContent = barTimer.textContent;
+    }, 500);
+    showToast("Ventana flotante abierta: ¡Arrástrala a tu segunda pantalla!");
+  }
 }
 
 // Setup Sidebar Categories & Search
