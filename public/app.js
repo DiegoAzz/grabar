@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await setupDeviceSelectors();
   setupRecordingControls();
   setupCameraBubbleDragging();
+  setupFloatingBarDragging();
   setupNavCategories();
 });
 
@@ -772,6 +773,41 @@ function setupCameraBubbleDragging() {
   bubbleCloseBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleCamera();
+  });
+}
+
+// Make floating recording toolbar draggable anywhere on screen
+function setupFloatingBarDragging() {
+  const bar = document.getElementById('loom-floating-controls');
+  if (!bar) return;
+  let isDragging = false;
+  let startX, startY;
+
+  bar.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return;
+    isDragging = true;
+    startX = e.clientX - bar.offsetLeft;
+    startY = e.clientY - bar.offsetTop;
+    bar.style.cursor = 'grabbing';
+    bar.style.transition = 'none';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    let newX = e.clientX - startX;
+    let newY = e.clientY - startY;
+    newX = Math.max(0, Math.min(window.innerWidth - bar.offsetWidth, newX));
+    newY = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight, newY));
+    bar.style.left = `${newX}px`;
+    bar.style.top = `${newY}px`;
+    bar.style.transform = 'none';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      bar.style.cursor = 'default';
+    }
   });
 }
 
