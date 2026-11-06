@@ -332,9 +332,12 @@
       <span>Empezar a Grabar</span>
     </button>
 
-    <!-- Límite de tiempo -->
+    <!-- Límite de tiempo / Estado ilimitado -->
     <div class="text-center mt-2.5 mb-2">
-      <span class="text-[11px] text-gray-400 font-medium">Límite de grabación de 5 min</span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-400 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        Grabación ilimitada (Sin límite de tiempo)
+      </span>
     </div>
 
     <!-- Opción móvil nativa: Grabar con Cámara de Teléfono o Subir desde Galería -->
@@ -462,8 +465,9 @@
         <p class="text-xs text-gray-500 mt-1">Codificando y subiendo el video a tu biblioteca de trabajo.</p>
       </div>
       <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-        <div id="upload-progress-bar" class="bg-[#ff5745] h-full w-2/3 transition-all duration-300"></div>
+        <div id="upload-progress-bar" class="bg-[#ff5745] h-full w-0 transition-all duration-150"></div>
       </div>
+      <p id="upload-progress-text" class="text-xs font-semibold text-gray-600">Preparando video...</p>
     </div>
   </div>
 

@@ -144,7 +144,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 1024 * 1024 * 500 // 500 MB limit
+    fileSize: 1024 * 1024 * 1024 * 10 // 10 GB limit for infinite recordings
   }
 });
 
@@ -362,9 +362,12 @@ app.post('/api/videos/upload', requireAuth, upload.fields([
     const thumbFile = req.files.thumbnail ? req.files.thumbnail[0] : null;
 
     const durationNum = parseInt(req.body.duration) || 0;
-    const mins = Math.floor(durationNum / 60);
+    const hours = Math.floor(durationNum / 3600);
+    const mins = Math.floor((durationNum % 3600) / 60);
     const secs = durationNum % 60;
-    const durationFormatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const durationFormatted = hours > 0
+      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
     const admin = getAdminAuth();
 
@@ -525,10 +528,27 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Global error handler (e.g. Multer file size errors)
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error("Multer upload error:", err);
+    return res.status(400).json({ error: `Error al subir archivo: ${err.message}` });
+  } else if (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({ error: err.message || "Error interno del servidor" });
+  }
+  next();
+});
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
   console.log(`🎥 AppzGrabar Server is running on: http://localhost:${PORT}`);
   console.log(`📁 Video uploads stored in: ${UPLOADS_DIR}`);
   console.log(`🔐 Acceso protegido: Login en /login.html`);
   console.log(`=======================================================`);
 });
+
+// Configure infinite timeouts for massive video uploads and streaming
+server.timeout = 0; // No request timeout
+server.keepAliveTimeout = 600000; // 10 minutes
+server.headersTimeout = 605000;

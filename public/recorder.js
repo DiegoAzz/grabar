@@ -21,6 +21,11 @@ class LoomRecorder {
     this.isPaused = false;
     this.recordDuration = 0;
     this.timerInterval = null;
+    this.recordingStartTime = 0;
+    this.pausedAt = null;
+    this.wakeLock = null;
+    this.silentOscillator = null;
+    this.activeMimeType = 'video/webm';
     
     // Settings
     this.cameraEnabled = true;
@@ -61,6 +66,35 @@ class LoomRecorder {
     // Callbacks
     this.onDurationUpdate = null;
     this.onStateChange = null;
+  }
+
+  // Screen WakeLock to prevent system/display from sleeping or throttling background tabs
+  async acquireWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => {
+          if (this.isRecording) {
+            setTimeout(() => {
+              if (this.isRecording) this.acquireWakeLock();
+            }, 1000);
+          }
+        });
+        console.log("🔒 Screen WakeLock activado (la pantalla y la sesión no se suspenderán).");
+      } catch (err) {
+        console.warn("Screen WakeLock no disponible o denegado:", err);
+      }
+    }
+  }
+
+  releaseWakeLock() {
+    if (this.wakeLock) {
+      try {
+        this.wakeLock.release();
+      } catch (e) {}
+      this.wakeLock = null;
+      console.log("🔓 Screen WakeLock liberado.");
+    }
   }
 
   // Initialize devices
@@ -298,6 +332,7 @@ class LoomRecorder {
       }
 
       const options = mimeType ? { mimeType } : undefined;
+      this.activeMimeType = mimeType || 'video/webm';
       this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
 
       this.mediaRecorder.ondataavailable = (e) => {
@@ -306,13 +341,19 @@ class LoomRecorder {
         }
       };
 
+      this.mediaRecorder.onerror = (e) => {
+        console.warn("MediaRecorder warning/error caught:", e);
+      };
+
       this.mediaRecorder.start(1000);
       this.isRecording = true;
       this.isPaused = false;
+      this.recordingStartTime = Date.now();
+      await this.acquireWakeLock();
 
       this.timerInterval = setInterval(() => {
-        if (!this.isPaused) {
-          this.recordDuration++;
+        if (!this.isPaused && this.recordingStartTime) {
+          this.recordDuration = Math.floor((Date.now() - this.recordingStartTime) / 1000);
           if (this.onDurationUpdate) this.onDurationUpdate(this.recordDuration);
         }
       }, 1000);
@@ -375,8 +416,9 @@ class LoomRecorder {
     const screenTrack = this.screenStream.getVideoTracks()[0];
     if (screenTrack) {
       screenTrack.onended = () => {
-        if (this.isRecording) {
-          console.log("Flujo de pantalla finalizado por el navegador. Guardando video grabado...");
+        // Only stop if the user explicitly clicked "Stop sharing" and the track is truly ended
+        if (this.isRecording && screenTrack.readyState === 'ended' && !this.isPaused) {
+          console.log("Flujo de pantalla finalizado por el usuario ('Dejar de compartir'). Guardando video grabado...");
           const stopBtn = document.getElementById('bar-stop-btn');
           if (stopBtn) stopBtn.click();
         }
@@ -399,8 +441,8 @@ class LoomRecorder {
     this.screenVideoElem.setAttribute('playsinline', '');
     this.screenVideoElem.setAttribute('autoplay', '');
     this.screenVideoElem.muted = true;
-    // Keep it in DOM with slight opacity so Chrome's GPU compositor decodes all frames even in background
-    this.screenVideoElem.style.cssText = 'position:fixed;bottom:0;right:0;width:4px;height:4px;opacity:0.01;pointer-events:none;z-index:-999;';
+    // Keep it in DOM with slight opacity and 64x64px so Chrome's GPU compositor NEVER suspends decoder
+    this.screenVideoElem.style.cssText = 'position:fixed;bottom:0;right:0;width:64px;height:64px;opacity:0.02;pointer-events:none;z-index:-999;transform:translateZ(0);';
     document.body.appendChild(this.screenVideoElem);
 
     this.screenVideoElem.srcObject = this.screenStream;
@@ -453,6 +495,30 @@ class LoomRecorder {
       try { this.mixAudioContext.close(); } catch (e) {}
     }
     this.mixAudioContext = new AudioCtx();
+    if (this.mixAudioContext.state === 'suspended') {
+      await this.mixAudioContext.resume().catch(() => {});
+    }
+
+    // Auto-resume if browser tries to sleep AudioContext in background
+    this.mixAudioContext.onstatechange = () => {
+      if (this.isRecording && this.mixAudioContext && this.mixAudioContext.state === 'suspended') {
+        this.mixAudioContext.resume().catch(() => {});
+      }
+    };
+
+    // Silent keep-alive oscillator to prevent Chrome from throttling audio thread
+    try {
+      const silentOsc = this.mixAudioContext.createOscillator();
+      const silentGain = this.mixAudioContext.createGain();
+      silentGain.gain.value = 0.00001; // Inaudible
+      silentOsc.connect(silentGain);
+      silentGain.connect(this.mixAudioContext.destination);
+      silentOsc.start();
+      this.silentOscillator = silentOsc;
+    } catch (e) {
+      console.warn("Silent keep-alive audio not supported:", e);
+    }
+
     this.audioDestination = this.mixAudioContext.createMediaStreamDestination();
 
     // Add screen audio if present
@@ -497,6 +563,7 @@ class LoomRecorder {
     }
 
     const options = mimeType ? { mimeType } : undefined;
+    this.activeMimeType = mimeType || 'video/webm';
     this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
 
     this.mediaRecorder.ondataavailable = (e) => {
@@ -506,8 +573,10 @@ class LoomRecorder {
     };
 
     this.mediaRecorder.onerror = (e) => {
-      console.error("MediaRecorder error caught:", e);
-      if (this.isRecording) {
+      console.warn("MediaRecorder warning/error caught:", e);
+      // Do NOT abruptly abort recording unless recorder has truly died
+      if (this.mediaRecorder && this.mediaRecorder.state === 'inactive' && this.isRecording) {
+        console.warn("MediaRecorder transitioned to inactive. Finishing stream cleanly...");
         const stopBtn = document.getElementById('bar-stop-btn');
         if (stopBtn) stopBtn.click();
       }
@@ -517,11 +586,15 @@ class LoomRecorder {
     this.mediaRecorder.start(1000);
     this.isRecording = true;
     this.isPaused = false;
+    this.recordingStartTime = Date.now();
 
-    // Start timer
+    // Acquire Screen WakeLock so Windows/Chrome never sleep
+    await this.acquireWakeLock();
+
+    // Start timer with drift-free clock
     this.timerInterval = setInterval(() => {
-      if (!this.isPaused) {
-        this.recordDuration++;
+      if (!this.isPaused && this.recordingStartTime) {
+        this.recordDuration = Math.floor((Date.now() - this.recordingStartTime) / 1000);
         if (this.onDurationUpdate) this.onDurationUpdate(this.recordDuration);
       }
     }, 1000);
@@ -547,6 +620,9 @@ class LoomRecorder {
 
       // Draw active screen / window
       if (this.screenVideoElem && this.screenVideoElem.readyState >= 1) {
+        if (this.screenVideoElem.paused && this.isRecording) {
+          this.screenVideoElem.play().catch(() => {});
+        }
         try {
           ctx.drawImage(this.screenVideoElem, 0, 0, curW, curH);
         } catch (e) {}
@@ -582,6 +658,14 @@ class LoomRecorder {
       this.compositorWorker.onmessage = () => {
         if (document.hidden) {
           renderFrame();
+        }
+        // Independent master clock ticker (ensures time never freezes even if Chrome main thread throttles)
+        if (this.isRecording && !this.isPaused && this.recordingStartTime) {
+          const elapsedSec = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+          if (elapsedSec !== this.recordDuration) {
+            this.recordDuration = elapsedSec;
+            if (this.onDurationUpdate) this.onDurationUpdate(this.recordDuration);
+          }
         }
       };
       this.compositorWorker.postMessage('start');
@@ -695,6 +779,7 @@ class LoomRecorder {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.pause();
       this.isPaused = true;
+      this.pausedAt = Date.now();
       if (this.onStateChange) this.onStateChange({ isRecording: true, isPaused: true });
     }
   }
@@ -703,6 +788,10 @@ class LoomRecorder {
     if (this.mediaRecorder && this.mediaRecorder.state === 'paused') {
       this.mediaRecorder.resume();
       this.isPaused = false;
+      if (this.pausedAt) {
+        this.recordingStartTime += (Date.now() - this.pausedAt);
+        this.pausedAt = null;
+      }
       if (this.onStateChange) this.onStateChange({ isRecording: true, isPaused: false });
     }
   }
@@ -724,7 +813,7 @@ class LoomRecorder {
           return;
         }
 
-        const finalBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+        const finalBlob = new Blob(this.recordedChunks, { type: this.activeMimeType || 'video/webm' });
 
         // Generate crisp thumbnail
         let thumbBlob = null;
@@ -801,6 +890,11 @@ class LoomRecorder {
   }
 
   cleanupStreams() {
+    this.releaseWakeLock();
+    if (this.silentOscillator) {
+      try { this.silentOscillator.stop(); } catch (e) {}
+      this.silentOscillator = null;
+    }
     if (this.compositorWorker) {
       try {
         this.compositorWorker.postMessage('stop');

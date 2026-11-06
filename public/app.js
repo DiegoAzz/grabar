@@ -97,6 +97,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavCategories();
 });
 
+// Reusable XMLHttpRequest uploader with live upload progress for massive recordings
+function uploadVideoWithProgress(formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/videos/upload', true);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(e.loaded, e.total);
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+          resolve(data);
+        } else {
+          reject(new Error(data.error || `Error del servidor (${xhr.status})`));
+        }
+      } catch (e) {
+        reject(new Error(`Respuesta inválida del servidor (${xhr.status})`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Error de conexión durante la subida al servidor"));
+    xhr.ontimeout = () => reject(new Error("Tiempo de espera agotado al subir el video"));
+    xhr.timeout = 0; // Infinite timeout for long recordings
+
+    xhr.send(formData);
+  });
+}
+
 // Check Authentication & Setup User Profile
 async function checkAuthAndSetupProfile() {
   try {
@@ -473,7 +507,9 @@ function setupRecordingControls() {
 
       recordWidget.classList.add('hidden');
       savingModal.classList.remove('hidden');
-      uploadProgressBar.style.width = '30%';
+      uploadProgressBar.style.width = '10%';
+      const uploadProgressText = document.getElementById('upload-progress-text');
+      if (uploadProgressText) uploadProgressText.textContent = "Preparando video...";
 
       try {
         const formData = new FormData();
@@ -482,15 +518,19 @@ function setupRecordingControls() {
         formData.append('title', `Video Móvil - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
         formData.append('category', activeCategory);
 
-        uploadProgressBar.style.width = '65%';
+        const totalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
-        const res = await fetch('/api/videos/upload', {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
+        const data = await uploadVideoWithProgress(formData, (loaded, total) => {
+          const percent = Math.min(99, Math.round((loaded / total) * 100));
+          const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+          uploadProgressBar.style.width = `${percent}%`;
+          if (uploadProgressText) {
+            uploadProgressText.textContent = `Subiendo video: ${percent}% (${loadedMB} MB de ${totalSizeMB} MB)`;
+          }
         });
-        const data = await res.json();
+
         uploadProgressBar.style.width = '100%';
+        if (uploadProgressText) uploadProgressText.textContent = "¡Video subido con éxito! Abriendo...";
 
         if (data.success && data.video) {
           window.location.href = `/v/${data.video.id}`;
@@ -549,7 +589,9 @@ function setupRecordingControls() {
 
     floatingControls.classList.add('hidden');
     savingModal.classList.remove('hidden');
-    uploadProgressBar.style.width = '35%';
+    uploadProgressBar.style.width = '5%';
+    const uploadProgressText = document.getElementById('upload-progress-text');
+    if (uploadProgressText) uploadProgressText.textContent = "Preparando y finalizando codificación...";
 
     try {
       const result = await window.loomRecorder.stopRecording();
@@ -561,7 +603,8 @@ function setupRecordingControls() {
         return;
       }
 
-      uploadProgressBar.style.width = '70%';
+      uploadProgressBar.style.width = '15%';
+      if (uploadProgressText) uploadProgressText.textContent = "Iniciando subida al servidor...";
 
       // Prepare FormData for backend
       const formData = new FormData();
@@ -575,17 +618,27 @@ function setupRecordingControls() {
       formData.append('title', `${titlePrefix} - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
       formData.append('category', activeCategory);
 
-      const res = await fetch('/api/videos/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
+      const totalSizeMB = (result.videoBlob.size / (1024 * 1024)).toFixed(1);
+
+      const data = await uploadVideoWithProgress(formData, (loaded, total) => {
+        const percent = Math.min(99, Math.round((loaded / total) * 100));
+        const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+        uploadProgressBar.style.width = `${percent}%`;
+        if (uploadProgressText) {
+          uploadProgressText.textContent = `Guardando video: ${percent}% (${loadedMB} MB de ${totalSizeMB} MB)`;
+        }
       });
-      const data = await res.json();
+
       uploadProgressBar.style.width = '100%';
+      if (uploadProgressText) uploadProgressText.textContent = "¡Video guardado con éxito! Abriendo...";
 
       if (data.success && data.video) {
-        // Also backup to IndexedDB
-        await saveVideoToIDB(data.video, result.videoBlob);
+        // Only backup to IndexedDB if video is reasonably sized (<200MB) to protect browser storage
+        if (result.videoBlob.size < 200 * 1024 * 1024) {
+          try {
+            await saveVideoToIDB(data.video, result.videoBlob);
+          } catch (e) {}
+        }
 
         // Redirect to watch page
         window.location.href = `/v/${data.video.id}`;
@@ -594,7 +647,7 @@ function setupRecordingControls() {
       }
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Aviso: " + (err.message || "Error al subir video. Guardando copia de seguridad..."));
+      alert("Aviso: " + (err.message || "Error al subir video."));
       savingModal.classList.add('hidden');
       await fetchVideos();
     } finally {
@@ -777,9 +830,10 @@ function setupRecordingControls() {
 }
 
 function updateTimerDisplay(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
   const s = (totalSeconds % 60).toString().padStart(2, '0');
-  if (barTimer) barTimer.textContent = `${m}:${s}`;
+  if (barTimer) barTimer.textContent = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
 }
 
 // 3..2..1 Countdown
