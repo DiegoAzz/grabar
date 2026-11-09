@@ -97,6 +97,119 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavCategories();
 });
 
+// Helper for emergency direct download of Blob without server
+function downloadBlobDirectly(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename || `grabacion-appzgrabar-${Date.now()}.webm`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+// Subida por fragmentos (Chunked Upload) para videos largos (25+ min, 1h+) sin caídas por límites de proxy (413 Payload Too Large)
+async function uploadVideoChunked(videoBlob, thumbnailBlob, duration, title, category, onProgress) {
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB por fragmento (aprobado por cualquier proxy o servidor)
+  const totalSize = videoBlob.size;
+  const totalChunks = Math.max(1, Math.ceil(totalSize / CHUNK_SIZE));
+  const uploadId = `up_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const isMp4 = videoBlob.type && videoBlob.type.includes('mp4');
+
+  let uploadedBytes = 0;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, totalSize);
+    const chunk = videoBlob.slice(start, end);
+
+    let attempts = 0;
+    let success = false;
+    let lastError = null;
+
+    while (attempts < 3 && !success) {
+      attempts++;
+      try {
+        const formData = new FormData();
+        formData.append('chunk', chunk);
+        formData.append('uploadId', uploadId);
+        formData.append('chunkIndex', i);
+        formData.append('totalChunks', totalChunks);
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/videos/upload-chunk', true);
+          xhr.withCredentials = true;
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable && onProgress) {
+              const currentOverall = uploadedBytes + e.loaded;
+              onProgress(currentOverall, totalSize, i + 1, totalChunks);
+            }
+          };
+
+          xhr.onload = () => {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                resolve(data);
+              } else {
+                reject(new Error(data.error || `HTTP ${xhr.status}`));
+              }
+            } catch (err) {
+              reject(new Error(`Respuesta inválida (${xhr.status})`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Fallo de red en fragmento'));
+          xhr.ontimeout = () => reject(new Error('Tiempo de espera agotado'));
+          xhr.timeout = 180000;
+          xhr.send(formData);
+        });
+
+        uploadedBytes += chunk.size;
+        success = true;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Reintento de fragmento ${i + 1}/${totalChunks} (intento ${attempts}):`, err);
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    if (!success) {
+      throw new Error(`No se pudo subir la parte ${i + 1} de ${totalChunks}: ${lastError ? lastError.message : 'Error de conexión'}`);
+    }
+  }
+
+  // Ensamblar en el servidor
+  const completeFormData = new FormData();
+  completeFormData.append('uploadId', uploadId);
+  completeFormData.append('totalChunks', totalChunks);
+  completeFormData.append('duration', duration || 0);
+  completeFormData.append('title', title);
+  completeFormData.append('category', category);
+  completeFormData.append('ext', isMp4 ? 'mp4' : 'webm');
+  if (thumbnailBlob) {
+    completeFormData.append('thumbnail', thumbnailBlob, `thumb-${Date.now()}.jpg`);
+  }
+
+  const finalRes = await fetch('/api/videos/upload-complete', {
+    method: 'POST',
+    body: completeFormData
+  });
+
+  const finalData = await finalRes.json();
+  if (!finalRes.ok || !finalData.success) {
+    throw new Error(finalData.error || 'Error al ensamblar el video en el servidor');
+  }
+
+  return finalData;
+}
+
 // Reusable XMLHttpRequest uploader with live upload progress for massive recordings
 function uploadVideoWithProgress(formData, onProgress) {
   return new Promise((resolve, reject) => {
@@ -581,8 +694,120 @@ function setupRecordingControls() {
     updateTimerDisplay(sec);
   };
 
-  // Stop Recording
+  // Stop Recording & Upload Handler
   let isStoppingRecording = false;
+  window.lastRecordedResult = null;
+
+  async function executeUpload(result) {
+    const savingModalTitle = document.getElementById('saving-modal-title');
+    const savingModalDesc = document.getElementById('saving-modal-desc');
+    const savingSpinner = document.getElementById('saving-spinner');
+    const savingErrorActions = document.getElementById('saving-error-actions');
+    const retryUploadBtn = document.getElementById('retry-upload-btn');
+    const closeSavingModalBtn = document.getElementById('close-saving-modal-btn');
+    const directDownloadBackupBtn = document.getElementById('direct-download-backup-btn');
+    const uploadProgressText = document.getElementById('upload-progress-text');
+
+    if (savingErrorActions) savingErrorActions.classList.add('hidden');
+    if (savingSpinner) savingSpinner.classList.remove('hidden');
+    if (savingModalTitle) savingModalTitle.textContent = "Guardando tu video en AppzGrabar...";
+    if (savingModalDesc) savingModalDesc.textContent = "Codificando y transfiriendo el video a tu biblioteca.";
+    uploadProgressBar.style.width = '10%';
+    if (uploadProgressText) uploadProgressText.textContent = "Iniciando transferencia segura...";
+
+    // Hook direct download backup button immediately
+    if (directDownloadBackupBtn) {
+      const isMp4 = result.videoBlob.type && result.videoBlob.type.includes('mp4');
+      directDownloadBackupBtn.onclick = () => {
+        downloadBlobDirectly(result.videoBlob, `appzgrabar-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`);
+      };
+    }
+
+    try {
+      const titlePrefix = selectedRecordingMode === 'camera' ? 'Video Cámara' : 'Grabación de Pantalla';
+      const videoTitle = `${titlePrefix} - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+      const totalSizeMB = (result.videoBlob.size / (1024 * 1024)).toFixed(1);
+
+      let data;
+      // If video is larger than 15MB, use chunked upload to completely bypass proxy limits (Nginx 413)
+      if (result.videoBlob.size > 15 * 1024 * 1024) {
+        data = await uploadVideoChunked(result.videoBlob, result.thumbnailBlob, result.duration, videoTitle, activeCategory, (loaded, total, currentChunk, totalChunks) => {
+          const percent = Math.min(99, Math.round((loaded / total) * 100));
+          const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+          uploadProgressBar.style.width = `${percent}%`;
+          if (uploadProgressText) {
+            uploadProgressText.textContent = `Subiendo en partes: ${percent}% (Parte ${currentChunk}/${totalChunks} • ${loadedMB} MB de ${totalSizeMB} MB)`;
+          }
+        });
+      } else {
+        const formData = new FormData();
+        const isMp4 = result.videoBlob.type && result.videoBlob.type.includes('mp4');
+        formData.append('video', result.videoBlob, `appzgrabar-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`);
+        if (result.thumbnailBlob) {
+          formData.append('thumbnail', result.thumbnailBlob, `thumb-${Date.now()}.jpg`);
+        }
+        formData.append('duration', result.duration);
+        formData.append('title', videoTitle);
+        formData.append('category', activeCategory);
+
+        data = await uploadVideoWithProgress(formData, (loaded, total) => {
+          const percent = Math.min(99, Math.round((loaded / total) * 100));
+          const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+          uploadProgressBar.style.width = `${percent}%`;
+          if (uploadProgressText) {
+            uploadProgressText.textContent = `Guardando video: ${percent}% (${loadedMB} MB de ${totalSizeMB} MB)`;
+          }
+        });
+      }
+
+      uploadProgressBar.style.width = '100%';
+      if (uploadProgressText) uploadProgressText.textContent = "¡Video guardado con éxito! Abriendo...";
+
+      if (data && data.success && data.video) {
+        // Safe backup to IndexedDB only for videos under 200MB
+        if (result.videoBlob.size < 200 * 1024 * 1024) {
+          try {
+            await saveVideoToIDB(data.video, result.videoBlob);
+          } catch (e) {}
+        }
+        window.location.href = `/v/${data.video.id}`;
+      } else {
+        throw new Error(data?.error || 'Error al guardar el video en el servidor');
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      if (uploadProgressText) {
+        uploadProgressText.textContent = `Error: ${err.message || 'Fallo de conexión con el servidor'}`;
+      }
+      if (savingModalTitle) {
+        savingModalTitle.textContent = "Hubo un problema al subir al servidor";
+      }
+      if (savingModalDesc) {
+        savingModalDesc.textContent = "¡Tu grabación está a salvo en la memoria! Puedes descargar el archivo directo a tu PC con el botón verde de abajo, o reintentar la subida.";
+      }
+      if (savingSpinner) savingSpinner.classList.add('hidden');
+      if (savingErrorActions) savingErrorActions.classList.remove('hidden');
+
+      if (retryUploadBtn) {
+        retryUploadBtn.onclick = () => {
+          if (window.lastRecordedResult) {
+            executeUpload(window.lastRecordedResult);
+          }
+        };
+      }
+
+      if (closeSavingModalBtn) {
+        closeSavingModalBtn.onclick = () => {
+          savingModal.classList.add('hidden');
+          recordWidget.classList.remove('hidden');
+          fetchVideos();
+        };
+      }
+    } finally {
+      isStoppingRecording = false;
+    }
+  }
+
   barStopBtn.addEventListener('click', async () => {
     if (isStoppingRecording) return;
     isStoppingRecording = true;
@@ -603,54 +828,13 @@ function setupRecordingControls() {
         return;
       }
 
-      uploadProgressBar.style.width = '15%';
-      if (uploadProgressText) uploadProgressText.textContent = "Iniciando subida al servidor...";
-
-      // Prepare FormData for backend
-      const formData = new FormData();
-      const isMp4 = result.videoBlob.type && result.videoBlob.type.includes('mp4');
-      formData.append('video', result.videoBlob, `appzgrabar-${Date.now()}.${isMp4 ? 'mp4' : 'webm'}`);
-      if (result.thumbnailBlob) {
-        formData.append('thumbnail', result.thumbnailBlob, `thumb-${Date.now()}.jpg`);
-      }
-      formData.append('duration', result.duration);
-      const titlePrefix = selectedRecordingMode === 'camera' ? 'Video Cámara' : 'Grabación de Pantalla';
-      formData.append('title', `${titlePrefix} - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
-      formData.append('category', activeCategory);
-
-      const totalSizeMB = (result.videoBlob.size / (1024 * 1024)).toFixed(1);
-
-      const data = await uploadVideoWithProgress(formData, (loaded, total) => {
-        const percent = Math.min(99, Math.round((loaded / total) * 100));
-        const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
-        uploadProgressBar.style.width = `${percent}%`;
-        if (uploadProgressText) {
-          uploadProgressText.textContent = `Guardando video: ${percent}% (${loadedMB} MB de ${totalSizeMB} MB)`;
-        }
-      });
-
-      uploadProgressBar.style.width = '100%';
-      if (uploadProgressText) uploadProgressText.textContent = "¡Video guardado con éxito! Abriendo...";
-
-      if (data.success && data.video) {
-        // Only backup to IndexedDB if video is reasonably sized (<200MB) to protect browser storage
-        if (result.videoBlob.size < 200 * 1024 * 1024) {
-          try {
-            await saveVideoToIDB(data.video, result.videoBlob);
-          } catch (e) {}
-        }
-
-        // Redirect to watch page
-        window.location.href = `/v/${data.video.id}`;
-      } else {
-        throw new Error(data.error || 'Error al guardar el video en el servidor');
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      alert("Aviso: " + (err.message || "Error al subir video."));
+      window.lastRecordedResult = result;
+      await executeUpload(result);
+    } catch (stopErr) {
+      console.error("Stop recording error:", stopErr);
+      alert("Error al finalizar la grabación: " + stopErr.message);
       savingModal.classList.add('hidden');
-      await fetchVideos();
-    } finally {
+      recordWidget.classList.remove('hidden');
       isStoppingRecording = false;
     }
   });

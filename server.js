@@ -148,6 +148,33 @@ const upload = multer({
   }
 });
 
+// Chunked Upload Storage Configuration (for long recordings through strict proxies)
+const CHUNKS_DIR = path.join(__dirname, 'data', 'chunks');
+if (!fs.existsSync(CHUNKS_DIR)) fs.mkdirSync(CHUNKS_DIR, { recursive: true });
+
+const chunkStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadId = req.body.uploadId;
+    if (!uploadId || !/^[a-zA-Z0-9_-]+$/.test(uploadId)) {
+      return cb(new Error('uploadId inválido'));
+    }
+    const targetDir = path.join(CHUNKS_DIR, uploadId);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    cb(null, targetDir);
+  },
+  filename: function (req, file, cb) {
+    const chunkIndex = req.body.chunkIndex || '0';
+    cb(null, `chunk_${chunkIndex}`);
+  }
+});
+
+const uploadChunk = multer({
+  storage: chunkStorage,
+  limits: { fileSize: 60 * 1024 * 1024 } // 60MB per individual chunk
+});
+
 // Middlewares
 app.use(cors());
 app.use(cookieParser());
@@ -348,7 +375,112 @@ app.get('/api/videos/:id', (req, res) => {
   res.json({ success: true, video });
 });
 
-// 3. Upload new video (PROTECTED: Only authenticated user can record and upload)
+// Chunk Upload: Recibir fragmento individual (inmune a límites de proxy)
+app.post('/api/videos/upload-chunk', requireAuth, uploadChunk.single('chunk'), (req, res) => {
+  const { uploadId, chunkIndex, totalChunks } = req.body;
+  if (!uploadId || chunkIndex === undefined) {
+    return res.status(400).json({ error: 'Faltan parámetros de fragmento' });
+  }
+  res.json({ success: true, chunkIndex: parseInt(chunkIndex, 10), uploadId });
+});
+
+// Chunk Upload Complete: Ensamblar todos los fragmentos
+app.post('/api/videos/upload-complete', requireAuth, upload.single('thumbnail'), async (req, res) => {
+  try {
+    const { uploadId, totalChunks, title, description, duration, category, ext } = req.body;
+    if (!uploadId || !totalChunks) {
+      return res.status(400).json({ error: 'Faltan datos de finalización' });
+    }
+
+    const chunkDir = path.join(CHUNKS_DIR, uploadId);
+    if (!fs.existsSync(chunkDir)) {
+      return res.status(404).json({ error: 'No se encontraron fragmentos de este video' });
+    }
+
+    const targetExt = ext || 'webm';
+    const finalFilename = `${Date.now()}-${uuidv4().slice(0, 8)}.${targetExt}`;
+    const finalPath = path.join(UPLOADS_DIR, finalFilename);
+
+    // Concatenate all chunks in order
+    const writeStream = fs.createWriteStream(finalPath);
+    const count = parseInt(totalChunks, 10);
+
+    for (let i = 0; i < count; i++) {
+      const chunkFile = path.join(chunkDir, `chunk_${i}`);
+      if (!fs.existsSync(chunkFile)) {
+        writeStream.destroy();
+        try { fs.unlinkSync(finalPath); } catch (e) {}
+        return res.status(400).json({ error: `Falta el fragmento ${i} de la grabación` });
+      }
+      const data = fs.readFileSync(chunkFile);
+      writeStream.write(data);
+    }
+
+    await new Promise((resolve) => writeStream.end(resolve));
+
+    // Cleanup chunks folder
+    try {
+      fs.rmSync(chunkDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn("Error limpiando directorio de chunks:", e);
+    }
+
+    const stat = fs.statSync(finalPath);
+    const thumbFile = req.file;
+
+    const durationNum = parseInt(duration, 10) || 0;
+    const hours = Math.floor(durationNum / 3600);
+    const mins = Math.floor((durationNum % 3600) / 60);
+    const secs = durationNum % 60;
+    const durationFormatted = hours > 0
+      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    const admin = getAdminAuth();
+
+    const newVideo = {
+      id: uuidv4().slice(0, 12),
+      title: title || `Grabación de Pantalla - ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+      description: description || "Grabado con AppzGrabar",
+      filename: finalFilename,
+      videoUrl: `/uploads/${finalFilename}`,
+      thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : null,
+      duration: durationNum,
+      durationFormatted: durationFormatted,
+      size: stat.size,
+      createdAt: new Date().toISOString(),
+      views: 1,
+      category: category || 'videos',
+      author: {
+        name: admin.name || "Diego",
+        avatar: admin.avatar,
+        role: "Creador"
+      },
+      reactions: [
+        { emoji: "🔥", count: 0 },
+        { emoji: "👍", count: 0 },
+        { emoji: "❤️", count: 0 },
+        { emoji: "🎉", count: 0 },
+        { emoji: "🚀", count: 0 }
+      ],
+      comments: [],
+      chapters: []
+    };
+
+    const videos = getVideosDB();
+    videos.unshift(newVideo);
+    saveVideosDB(videos);
+
+    console.log(`✅ Video largo ensamblado y guardado exitosamente: ${finalFilename} (${(stat.size / (1024 * 1024)).toFixed(2)} MB)`);
+    res.json({ success: true, video: newVideo });
+
+  } catch (err) {
+    console.error("Error al completar subida por fragmentos:", err);
+    res.status(500).json({ error: err.message || "Error al procesar los fragmentos del video" });
+  }
+});
+
+// 3. Upload new video (PROTECTED: Standard single-file upload)
 app.post('/api/videos/upload', requireAuth, upload.fields([
   { name: 'video', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 }

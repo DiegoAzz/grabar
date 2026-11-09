@@ -453,21 +453,39 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODAL DE GUARDADO Y SUBIDA -->
+  <!-- MODAL DE GUARDADO Y SUBIDA RESILIENTE (CON RESPALDO DIRECTO) -->
   <!-- ========================================================================= -->
   <div id="saving-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-[100002]">
-    <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center space-y-4">
-      <div class="w-14 h-14 bg-indigo-50 text-[#625df5] rounded-full flex items-center justify-center mx-auto animate-spin">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full mx-4 shadow-2xl text-center space-y-4 border border-gray-100">
+      <div id="saving-spinner" class="w-14 h-14 bg-indigo-50 text-[#625df5] rounded-full flex items-center justify-center mx-auto animate-spin">
         <i data-lucide="loader-2" class="w-7 h-7"></i>
       </div>
       <div>
-        <h3 class="text-lg font-bold text-gray-900">Guardando tu video en AppzGrabar...</h3>
-        <p class="text-xs text-gray-500 mt-1">Codificando y subiendo el video a tu biblioteca de trabajo.</p>
+        <h3 id="saving-modal-title" class="text-lg font-bold text-gray-900">Guardando tu video en AppzGrabar...</h3>
+        <p id="saving-modal-desc" class="text-xs text-gray-500 mt-1">Codificando y transfiriendo el video a tu biblioteca.</p>
       </div>
-      <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+      <div id="saving-progress-container" class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
         <div id="upload-progress-bar" class="bg-[#ff5745] h-full w-0 transition-all duration-150"></div>
       </div>
-      <p id="upload-progress-text" class="text-xs font-semibold text-gray-600">Preparando video...</p>
+      <p id="upload-progress-text" class="text-xs font-semibold text-gray-700">Preparando video...</p>
+
+      <!-- Botón de descarga de respaldo siempre disponible -->
+      <div id="saving-backup-box" class="pt-3 border-t border-gray-100">
+        <button id="direct-download-backup-btn" type="button" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Descargar copia directa a mi PC (.webm)</span>
+        </button>
+      </div>
+
+      <!-- Acciones de reintento en caso de fallo de red -->
+      <div id="saving-error-actions" class="hidden flex items-center gap-2 pt-2">
+        <button id="retry-upload-btn" type="button" class="flex-1 py-2.5 px-3 bg-[#625df5] hover:bg-[#504be4] text-white rounded-xl text-xs font-semibold transition-all">
+          Reintentar subida
+        </button>
+        <button id="close-saving-modal-btn" type="button" class="py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-medium transition-all">
+          Cerrar
+        </button>
+      </div>
     </div>
   </div>
 

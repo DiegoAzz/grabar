@@ -331,7 +331,11 @@ class LoomRecorder {
         }
       }
 
-      const options = mimeType ? { mimeType } : undefined;
+      const options = {
+        videoBitsPerSecond: 2500000, // 2.5 Mbps crisp 1080p, ultra-efficient memory footprint
+        audioBitsPerSecond: 128000
+      };
+      if (mimeType) options.mimeType = mimeType;
       this.activeMimeType = mimeType || 'video/webm';
       this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
 
@@ -562,7 +566,11 @@ class LoomRecorder {
       }
     }
 
-    const options = mimeType ? { mimeType } : undefined;
+    const options = {
+      videoBitsPerSecond: 2500000, // 2.5 Mbps crisp 1080p, ultra-efficient memory footprint
+      audioBitsPerSecond: 128000
+    };
+    if (mimeType) options.mimeType = mimeType;
     this.activeMimeType = mimeType || 'video/webm';
     this.mediaRecorder = new MediaRecorder(this.combinedStream, options);
 
@@ -673,12 +681,18 @@ class LoomRecorder {
       console.warn("Worker compositor ticker fallback:", workerErr);
     }
 
-    // 2. High-performance requestAnimationFrame loop for foreground
-    const animLoop = () => {
+    // 2. High-performance requestAnimationFrame loop for foreground, strictly throttled to 30 FPS
+    let lastDrawTime = 0;
+    const targetInterval = 1000 / 30; // 33.3ms = 30 FPS strict
+
+    const animLoop = (timestamp) => {
       if (!this.isRecording || !this.isCompositing) return;
       this.compositeAnimFrame = requestAnimationFrame(animLoop);
       if (!document.hidden) {
-        renderFrame();
+        if (!timestamp || (timestamp - lastDrawTime >= targetInterval - 3)) {
+          lastDrawTime = timestamp || performance.now();
+          renderFrame();
+        }
       }
     };
     this.compositeAnimFrame = requestAnimationFrame(animLoop);
@@ -851,8 +865,16 @@ class LoomRecorder {
         });
       };
 
+      let finished = false;
+      const safeFinish = async () => {
+        if (!finished) {
+          finished = true;
+          await buildAndFinish();
+        }
+      };
+
       if (!this.mediaRecorder) {
-        await buildAndFinish();
+        await safeFinish();
         return;
       }
 
@@ -861,15 +883,18 @@ class LoomRecorder {
           this.mediaRecorder.requestData();
         } catch (e) {}
 
-        this.mediaRecorder.onstop = buildAndFinish;
+        this.mediaRecorder.onstop = safeFinish;
+        // Safety timeout: if onstop doesn't fire within 2500ms, force finish to prevent hanging
+        setTimeout(safeFinish, 2500);
+
         try {
           this.mediaRecorder.stop();
         } catch (e) {
-          await buildAndFinish();
+          await safeFinish();
         }
       } else {
         // MediaRecorder was already inactive or stopped (e.g. Chrome toolbar "Stop sharing")
-        await buildAndFinish();
+        await safeFinish();
       }
     });
   }
