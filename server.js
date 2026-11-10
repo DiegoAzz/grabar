@@ -19,6 +19,44 @@ const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+// Polyfill FileReader for fix-webm-duration in Node.js
+if (typeof global.FileReader === 'undefined') {
+  global.FileReader = class SimpleFileReader {
+    readAsArrayBuffer(blob) {
+      blob.arrayBuffer().then(buf => {
+        this.result = buf;
+        if (this.onloadend) this.onloadend();
+      });
+    }
+  };
+}
+let fixWebmDuration = null;
+try {
+  fixWebmDuration = require('fix-webm-duration');
+} catch (e) {
+  console.warn("fix-webm-duration no encontrado:", e.message);
+}
+
+// Inyectar metadatos de duración EBML en archivos WebM para habilitar barra de reproducción completa y navegación en reproductores multimedia (Windows Media Player, VLC, QuickTime)
+async function fixWebmFileDuration(filePath, durationSec) {
+  try {
+    if (!fixWebmDuration || !fs.existsSync(filePath)) return;
+    if (!filePath.endsWith('.webm')) return;
+    const buf = fs.readFileSync(filePath);
+    const blob = new Blob([buf], { type: 'video/webm' });
+    const durationMs = Math.max(1000, Math.round((Number(durationSec) || 1) * 1000));
+    const fixedBlob = await fixWebmDuration(blob, durationMs, { logger: false });
+    const arrayBuffer = await fixedBlob.arrayBuffer();
+    const fixedBuf = Buffer.from(arrayBuffer);
+    if (!buf.equals(fixedBuf)) {
+      fs.writeFileSync(filePath, fixedBuf);
+      console.log(`✅ [fix-webm] Metadatos de duración (${durationSec}s) inyectados con éxito en ${path.basename(filePath)}`);
+    }
+  } catch (e) {
+    console.warn(`[fix-webm] Advertencia inyectando metadatos en ${filePath}:`, e.message);
+  }
+}
+
 // Admin Authentication Setup
 function getAdminAuth() {
   if (fs.existsSync(AUTH_FILE)) {
@@ -425,10 +463,15 @@ app.post('/api/videos/upload-complete', requireAuth, upload.single('thumbnail'),
       console.warn("Error limpiando directorio de chunks:", e);
     }
 
+    const durationNum = parseInt(duration, 10) || 0;
+
+    // Inyectar metadatos de duración EBML si es WebM para que los reproductores multimedia (Windows Media Player, VLC) tengan barra de reproducción activa y tiempo total
+    if (finalFilename.endsWith('.webm')) {
+      await fixWebmFileDuration(finalPath, durationNum);
+    }
+
     const stat = fs.statSync(finalPath);
     const thumbFile = req.file;
-
-    const durationNum = parseInt(duration, 10) || 0;
     const hours = Math.floor(durationNum / 3600);
     const mins = Math.floor((durationNum % 3600) / 60);
     const secs = durationNum % 60;
@@ -484,7 +527,7 @@ app.post('/api/videos/upload-complete', requireAuth, upload.single('thumbnail'),
 app.post('/api/videos/upload', requireAuth, upload.fields([
   { name: 'video', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 }
-]), (req, res) => {
+]), async (req, res) => {
   try {
     if (!req.files || !req.files.video) {
       return res.status(400).json({ error: 'Video file is required' });
@@ -494,6 +537,13 @@ app.post('/api/videos/upload', requireAuth, upload.fields([
     const thumbFile = req.files.thumbnail ? req.files.thumbnail[0] : null;
 
     const durationNum = parseInt(req.body.duration) || 0;
+
+    // Inyectar metadatos de duración EBML si es WebM para que reproductores multimedia externos reconozcan la duración y permitan adelantar/retroceder
+    if (videoFile.filename && videoFile.filename.endsWith('.webm')) {
+      await fixWebmFileDuration(videoFile.path, durationNum);
+    }
+
+    const stat = fs.statSync(videoFile.path);
     const hours = Math.floor(durationNum / 3600);
     const mins = Math.floor((durationNum % 3600) / 60);
     const secs = durationNum % 60;
@@ -512,7 +562,7 @@ app.post('/api/videos/upload', requireAuth, upload.fields([
       thumbnail: thumbFile ? `/uploads/${thumbFile.filename}` : null,
       duration: durationNum,
       durationFormatted: durationFormatted,
-      size: videoFile.size,
+      size: stat.size,
       createdAt: new Date().toISOString(),
       views: 1,
       category: req.body.category || 'videos',
@@ -684,3 +734,21 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 server.timeout = 0; // No request timeout
 server.keepAliveTimeout = 600000; // 10 minutes
 server.headersTimeout = 605000;
+
+// Auto-reparar metadatos de duración EBML en todos los videos WebM guardados al iniciar
+async function repairExistingVideosMetadata() {
+  try {
+    const videos = getVideosDB();
+    for (const v of videos) {
+      if (v.filename && v.filename.endsWith('.webm')) {
+        const fullPath = path.join(UPLOADS_DIR, v.filename);
+        if (fs.existsSync(fullPath)) {
+          await fixWebmFileDuration(fullPath, v.duration || 1);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Aviso al verificar metadatos de videos existentes:", err);
+  }
+}
+setTimeout(repairExistingVideosMetadata, 2000);

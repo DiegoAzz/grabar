@@ -203,11 +203,21 @@ function setupPlayerControls() {
     lucide.createIcons();
   });
 
+  function getVideoDuration() {
+    if (Number.isFinite(videoElem.duration) && videoElem.duration > 0) {
+      return videoElem.duration;
+    }
+    if (currentVideoData && currentVideoData.duration > 0) {
+      return currentVideoData.duration;
+    }
+    return 1;
+  }
+
   // Time & Scrubber updates
   videoElem.addEventListener('timeupdate', () => {
     const current = videoElem.currentTime;
-    const duration = videoElem.duration || 1;
-    const percent = (current / duration) * 100;
+    const duration = getVideoDuration();
+    const percent = Math.min(100, (current / duration) * 100);
     
     timelineScrubber.value = percent;
     timeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
@@ -215,7 +225,7 @@ function setupPlayerControls() {
   });
 
   timelineScrubber.addEventListener('input', () => {
-    const duration = videoElem.duration || 1;
+    const duration = getVideoDuration();
     videoElem.currentTime = (timelineScrubber.value / 100) * duration;
   });
 
@@ -224,7 +234,8 @@ function setupPlayerControls() {
     videoElem.currentTime = Math.max(0, videoElem.currentTime - 5);
   });
   forwardBtn.addEventListener('click', () => {
-    videoElem.currentTime = Math.min(videoElem.duration || 0, videoElem.currentTime + 5);
+    const duration = getVideoDuration();
+    videoElem.currentTime = Math.min(duration, videoElem.currentTime + 5);
   });
 
   // Volume & Mute

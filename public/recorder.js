@@ -827,7 +827,19 @@ class LoomRecorder {
           return;
         }
 
-        const finalBlob = new Blob(this.recordedChunks, { type: this.activeMimeType || 'video/webm' });
+        let finalBlob = new Blob(this.recordedChunks, { type: this.activeMimeType || 'video/webm' });
+        const dur = Math.max(1, this.recordDuration);
+
+        // Inyectar metadatos de duración EBML para que Windows Media Player, VLC y navegadores tengan barra de reproducción funcional (adelantar, retroceder y duración total)
+        if (typeof ysFixWebmDuration === 'function' && (this.activeMimeType || 'video/webm').includes('webm')) {
+          try {
+            const durationMs = Math.round(dur * 1000);
+            finalBlob = await ysFixWebmDuration(finalBlob, durationMs, { logger: false });
+            console.log("✅ Metadatos de duración EBML inyectados en el navegador:", dur, "s");
+          } catch (errFix) {
+            console.warn("Advertencia inyectando duración WebM en cliente:", errFix);
+          }
+        }
 
         // Generate crisp thumbnail
         let thumbBlob = null;
@@ -848,8 +860,6 @@ class LoomRecorder {
         } catch (e) {
           console.warn("Thumbnail capture error:", e);
         }
-
-        const dur = Math.max(1, this.recordDuration);
 
         // Cleanup tracks
         this.cleanupStreams();
